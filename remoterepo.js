@@ -132,7 +132,7 @@ coccyx.RemoteRepo.prototype.save = function(model) {
   var ioId = this.nextId();
   var deferred = new goog.async.Deferred();
 
-  console.log('Saving ' + uri + ' as ' + js);
+  console.log('Saving ' + uri);
   this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.PUT, js, null, null,
       goog.bind(deferred.callback, deferred));
 
@@ -154,12 +154,10 @@ coccyx.RemoteRepo.prototype.save = function(model) {
 coccyx.RemoteRepo.prototype.onSave = function(model, e) {
   var response = this.parseResponse(e);
 
-  console.log(response);
   if (e.target.isSuccess()) {
     response && model.setAttributes(response);
     return model;
   } else {
-    console.log(response);
     response && model.setErrors(response);
     throw Error(response);
   }
@@ -220,7 +218,6 @@ coccyx.RemoteRepo.prototype.onDestroy = function(model, e) {
  * @protected
  */
 coccyx.RemoteRepo.prototype.parseResponse = function(e) {
-  console.log(e.target.getResponseText());
 
   //TODO: if the server returns a 500 error this doesn't handle it gracefully
   // we need to separate out the logic here for parsing the different response
@@ -398,7 +395,6 @@ coccyx.RemoteRepo.prototype.getIdentifier = function(arg) {
  * @return {string} The resulting uri.
  */
 coccyx.RemoteRepo.prototype.serializeParams = function(params) {
-  console.error('coccyx.RemoteRepo.prototype.serializeParams not implemented');
   return '';
 };
 
