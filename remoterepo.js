@@ -5,20 +5,6 @@ goog.require('coccyx.Repo');
 goog.require('goog.net.XhrManager');
 
 
-/**
- * HTTP Methods enum
- * @enum {string}
- */
-coccyx.RemoteRepo.Method = {
-
-  GET: 'GET',
-  POST: 'POST',
-  PUT: 'PUT',
-  DELETE: 'DELETE'
-
-};
-
-
 
 /**
  * A simple abstraction to act as a type of model repo for persisting objects
@@ -415,4 +401,16 @@ coccyx.RemoteRepo.prototype.serializeParams = function(params) {
   console.error('coccyx.RemoteRepo.prototype.serializeParams not implemented');
   return '';
 };
+
+
+/**
+ * @enum {string}
+ */
+coccyx.RemoteRepo.Method = {
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  DELETE: 'DELETE'
+};
+
 
