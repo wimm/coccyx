@@ -10,7 +10,7 @@ goog.require('goog.structs.Collection');
  * A class representing an ordered list of models. Views can subscribe directly
  * to the collection and/or use the collection as their "model" class. For
  * instance a list control might consist of an outer component with a list of
- * models stored in a collection and a view control or each item mapped to
+ * models stored in a collection and a view control for each item mapped to
  * individual models.
  * @constructor
  * @extends {goog.pubsub.PubSub}
@@ -82,5 +82,5 @@ coccyx.Collection.prototype.forEach = function(f, opt_obj) {
 coccyx.Collection.Topics = {
   REFRESH: 'refresh',
   ADD: 'add',
-  REMOVE: 'destroy'
+  REMOVE: 'remove'
 };
