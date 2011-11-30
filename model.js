@@ -15,7 +15,8 @@ goog.provide('coccyx.Model.Topics');
 goog.require('goog.array');
 goog.require('goog.object');
 goog.require('goog.pubsub.PubSub');
-goog.require('goog.structs.Map');
+goog.require('goog.string');
+goog.require('goog.ui.IdGenerator');
 
 
 
@@ -27,6 +28,15 @@ coccyx.Model = function() {
   goog.base(this);
 };
 goog.inherits(coccyx.Model, goog.pubsub.PubSub);
+
+
+/**
+ * Generator used to generate temporary unique IDs for managing models on
+ * the client side before they get persisted to the service.
+ * @type {goog.ui.IdGenerator}
+ * @private
+ */
+coccyx.Model.prototype.idGenerator_ = goog.ui.IdGenerator.getInstance();
 
 
 /**
@@ -43,16 +53,9 @@ coccyx.Model.prototype.setAttributes = goog.abstractMethod;
 coccyx.Model.prototype.save = function() {
   this.setErrors(null);
   this.publish(coccyx.Model.Topics.SAVING, this);
-  var deferred;
-
-  if (this.validate()) {
-    //TODO: send validation state change notification?
-    deferred = this.getRepo().save(this);
-  } else {
-    this.onError();
-    //fail immediately
-    deferred = goog.async.Deferred.fail(this);
-  }
+  var deferred = (this.validate()) ?
+      this.getRepo().save(this) :
+      goog.async.Deferred.fail(this);
 
   deferred.addCallback(this.onSave, this);
   deferred.addErrback(this.onError, this);
@@ -78,6 +81,7 @@ coccyx.Model.prototype.destroy = function() {
  *
  */
 coccyx.Model.prototype.onSave = function() {
+  this.persisted = true;
   this.publish(coccyx.Model.Topics.UPDATE, this);
 };
 
@@ -127,9 +131,48 @@ coccyx.Model.prototype.getRepo = function() {
 
 
 /**
- * @type {number|string} The id for this object.
+ * Gets the id for this model, creating a temporary id if none exists.
+ * @return {string|number} id for this model.
  */
-coccyx.Model.prototype.id;
+coccyx.Model.prototype.getId = function() {
+  //in theory id could be truthy 'false'
+  if (coccyx.isNullOrUndefined(this.id_)) {
+    this.id_ = coccyx.Model.tempIdPrefix +
+        '.' + this.idGenerator_.getNextUniqueId();
+  }
+  return this.id_;
+};
+
+
+/**
+ * Setting the id is 'special' because we use the id to track this object
+ * in collections so we need to explicitly know when the id gets changed.
+ * @param {string|number} newId The new id for this model.
+ */
+coccyx.Model.prototype.setId = function(newId) {
+  if (this.id_ !== newId) {
+    this.id_ = newId;
+    this.publish(coccyx.Model.Topics.UPDATE_ID, this);
+  }
+};
+
+
+/**
+ * We need to determine, when saving, whether the model has been saved (and
+ * therefore has a valid global ID, or if it just has a local temp ID.
+ * @return {boolean} Whether the model has been saved.
+ */
+coccyx.Model.prototype.isPersisted = function() {
+  return !coccyx.isNullOrUndefined(this.id_) &&
+      !goog.string.startsWith(this.id_.toString(), coccyx.Model.tempIdPrefix);
+};
+
+
+/**
+ * @type {number|string} The id for this object.
+ * @private
+ */
+coccyx.Model.prototype.id_;
 
 
 /**
@@ -158,6 +201,14 @@ coccyx.Model.Topics = {
   DESTROYING: 'destroying',
   UPDATE: 'update',
   SAVING: 'saving',
-  ERROR: 'error'
+  ERROR: 'error',
+  UPDATE_ID: 'updateId'
 };
+
+
+/**
+ * The prefix used to determine whether the id for this model is temporary or
+ * if the model has been persisted and given an id by the repository.
+ */
+coccyx.Model.tempIdPrefix = 'temp';
 

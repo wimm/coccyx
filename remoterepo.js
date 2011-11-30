@@ -127,13 +127,14 @@ coccyx.RemoteRepo.prototype.save = function(model) {
 
   var uri = this.uriFor(model);
 
-  var js = this.serializeResource(model.toJson());
-
+  var payload = this.serializeResource(model.toJson());
+  console.log(payload);
   var ioId = this.nextId();
   var deferred = new goog.async.Deferred();
-
+  var method = model.isPersisted() ?
+      coccyx.RemoteRepo.Method.PUT : coccyx.RemoteRepo.Method.POST;
   console.log('Saving ' + uri);
-  this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.PUT, js, null, null,
+  this.xhrManager_.send(ioId, uri, method, payload, null, null,
       goog.bind(deferred.callback, deferred));
 
   deferred.addCallback(goog.bind(this.onSave, this, model));
@@ -170,7 +171,7 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
 coccyx.RemoteRepo.prototype.destroy = function(
     arg, callback) {
 
-  if (wimm.isNullOrUndefined(arg)) {
+  if (coccyx.isNullOrUndefined(arg)) {
     throw new Error('No object received');
   }
   var uri = this.uriFor(arg);
@@ -336,6 +337,9 @@ coccyx.RemoteRepo.prototype.useRawJson = function(useRaw) {
 
 
 /**
+ * TODO: I'd like to centralize the URL handling somewhere, either in soy-based
+ * templates or in a more sophisticated routing mechanism.
+ *
  * The function that will produce the edit uri for this model.
  * Subclasses should override this if not using Rails-style REST.
  * @param {string|number|coccyx.Model=} opt_arg The id or object whos id to use.
@@ -350,12 +354,12 @@ coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
   var oid;
   if (opt_arg) {
     oid = this.getIdentifier(opt_arg);
-    if (!wimm.isNullOrUndefined(oid)) {
+    if (oid !== void 0) {
       uri += '/' + oid;
     }
   }
 
-  if (!wimm.isNullOrUndefined(opt_action)) {
+  if (!coccyx.isNullOrUndefined(opt_action)) {
     uri += '/' + opt_action;
   }
 
@@ -376,7 +380,7 @@ coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
  * Sometimes we may want to use something other than the id of the object, like
  * the slug.
  * @param {string|number|coccyx.Model} arg The id or object whos id to use.
- * @return {string} The identifier for the arg.
+ * @return {string?} The identifier for the arg or undefined.
  */
 coccyx.RemoteRepo.prototype.getIdentifier = function(arg) {
   var oid;
@@ -384,7 +388,7 @@ coccyx.RemoteRepo.prototype.getIdentifier = function(arg) {
     oid = arg.toString();
   } else {
     var model = /** @type {coccyx.Model} */(arg);
-    !wimm.isNullOrUndefined(model.id) && (oid = model.id.toString());
+    model.isPersisted() && (oid = model.getId().toString());
   }
   return oid;
 };
