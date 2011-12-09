@@ -49,7 +49,7 @@ coccyx.Repo.prototype.save = goog.abstractMethod;
 
 
 /**
- * @param {string|number|coccyx.Model} arg The id or object who's id to use.
+ * @param {coccyx.Model} arg The model to destroy.
  * @return {goog.async.Deferred} A deferred object representing this request,
  *     the deferred callback will call onDestroy or onError on the model and
  *     also pass the model through the callback chain of the deferred.

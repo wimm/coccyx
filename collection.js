@@ -117,6 +117,7 @@ coccyx.Collection.prototype.onChildError = function(child) {
  * @return {boolean} True if model was removed.
  */
 coccyx.Collection.prototype.remove = function(arg) {
+  var success = false;
   if (arg) {
     var id = (goog.typeOf(arg) === 'object') ? arg.getId() : arg;
     var child = this.getChild((/** @type {string|number} */ id));

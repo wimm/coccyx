@@ -87,7 +87,7 @@ coccyx.ModelController.prototype.setModel = function(model) {
  */
 coccyx.ModelController.prototype.show = function(arg) {
   var deferred;
-  if (typeof opt_arg == 'string' || typeof opt_arg == 'number') {
+  if (typeof arg == 'string' || typeof arg == 'number') {
     deferred = this.getRepo().get(/** @type {string|number} */ (arg));
   } else {
     deferred = goog.async.Deferred.succeed(arg);
@@ -113,7 +113,7 @@ coccyx.ModelController.prototype.onShow = goog.abstractMethod;
  */
 coccyx.ModelController.prototype.edit = function(arg) {
   var deferred;
-  if (typeof opt_arg == 'string' || typeof opt_arg == 'number') {
+  if (typeof arg == 'string' || typeof arg == 'number') {
     deferred = this.getRepo().get(/** @type {string|number} */ (arg));
   } else {
     deferred = goog.async.Deferred.succeed(arg);

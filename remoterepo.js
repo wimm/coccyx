@@ -72,9 +72,12 @@ coccyx.RemoteRepo.prototype.onGetAll = function(e) {
   if (e.target.isSuccess()) {
     var collection = this.newCollection();
     for (var i = 0; i < response.length; i++) {
-      var model = new this.newModel();
-      model.setAttributes(response[i]);
-      collection.add(model);
+      var model = this.newModel();
+      var contents = response[i];
+      if (contents != null && model != null) {
+        model.setAttributes(contents);
+        collection.add(model);
+      }
     }
     return collection;
   } else {
@@ -169,12 +172,12 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
  * @inheritDoc
  */
 coccyx.RemoteRepo.prototype.destroy = function(
-    arg, callback) {
+    model, callback) {
 
-  if (coccyx.isNullOrUndefined(arg)) {
+  if (coccyx.isNullOrUndefined(model)) {
     throw new Error('No object received');
   }
-  var uri = this.uriFor(arg);
+  var uri = this.uriFor(model);
   var ioId = this.nextId();
   var deferred = new goog.async.Deferred();
 
