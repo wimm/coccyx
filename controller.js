@@ -166,13 +166,13 @@ coccyx.CollectionController.prototype.onIndex = goog.abstractMethod;
  * @type {coccyx.Collection} The collection for this controller.
  * @private
  */
-coccyx.Controller.prototype.collection_;
+coccyx.CollectionController.prototype.collection_;
 
 
 /**
  * @return {coccyx.Collection} The collection for this controller.
  */
-coccyx.Controller.prototype.getCollection = function() {
+coccyx.CollectionController.prototype.getCollection = function() {
   return this.collection_;
 };
 
@@ -180,7 +180,7 @@ coccyx.Controller.prototype.getCollection = function() {
 /**
  * @param {coccyx.Collection} collection The collection for this controller.
  */
-coccyx.Controller.prototype.setCollection = function(collection) {
+coccyx.CollectionController.prototype.setCollection = function(collection) {
   this.collection_ = collection;
 };
 
