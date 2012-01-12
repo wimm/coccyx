@@ -1,5 +1,6 @@
 goog.provide('coccyx.Repo');
 
+goog.require('coccyx.Collection');
 goog.require('coccyx.Model');
 goog.require('goog.async.Deferred');
 goog.require('goog.pubsub.PubSub');

@@ -40,9 +40,67 @@ coccyx.Model.prototype.idGenerator_ = goog.ui.IdGenerator.getInstance();
 
 
 /**
- * @param {!Object} json The json representation of the model's attributes.
+ * @param {!Object} obj The json representation of the model's attributes.
  */
-coccyx.Model.prototype.setAttributes = goog.abstractMethod;
+coccyx.Model.prototype.setAttributes = function(obj) {
+  var idKey = this.repo.getIdKey();
+  var id = obj[idKey];
+
+  if (!coccyx.isNullOrUndefined(id)) {
+    // we don't want the id to be set again below. TODO: maybe clone obj?
+    delete obj[idKey];
+    this.setId(id);
+  }
+
+  var updated = [];
+  // walk through the keys on the json object and use the obfuscated attribute
+  // key map to set the corresponding attribute on ourselves.
+  goog.object.forEach(obj, function(val, key, object) {
+    var obfKey = this.attributeKeys[key];
+    if (obfKey && this[obfKey] !== val) {
+      //NOTE: this is unsafe-ish, since we're ignoring types.
+      this[obfKey] = val;
+      updated.push(key);
+    }
+  }, this);
+};
+
+
+/**
+ * @param {Array.<string>=} opt_include A limited set of attributes to include
+ *    in the json output instead of including everything. These must match the
+ *    strings passed to the setAttributeKeys function.
+ * @return {Object} the serialized json object.
+ */
+coccyx.Model.prototype.toJson = function(opt_include) {
+
+  var json = {};
+  json[this.repo.getIdKey()] = this.getId();
+
+  var keys = opt_include || goog.object.getKeys(this.attributeKeys);
+
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var obfKey = this.attributeKeys[key];
+
+    if (obfKey && this[obfKey] !== void 0) {
+      json[key] = this[obfKey];
+    }
+  }
+
+  return json;
+};
+
+
+/**
+ * @param {Object} obj The obfuscated attribute-to-string mapping that has
+ *     been renamed via a call to {goog.reflect.object()}.
+ */
+coccyx.Model.prototype.setAttributeKeys = function(obj) {
+  // this takes an object like {$renamedParam$ : 'param'} and gives us an
+  // object of the form {param: '$renamedParam$'}
+  this.attributeKeys = goog.object.transpose(obj);
+};
 
 
 /**
@@ -78,7 +136,7 @@ coccyx.Model.prototype.destroy = function() {
 
 
 /**
- *
+ * Publishes an update message and flags the model as persisted.
  */
 coccyx.Model.prototype.onSave = function() {
   this.persisted = true;
@@ -87,7 +145,7 @@ coccyx.Model.prototype.onSave = function() {
 
 
 /**
- *
+ * Publishes an error message.
  */
 coccyx.Model.prototype.onError = function() {
   this.publish(coccyx.Model.Topics.ERROR, this);
@@ -95,7 +153,7 @@ coccyx.Model.prototype.onError = function() {
 
 
 /**
- *
+ * Publishes a destroy message.
  */
 coccyx.Model.prototype.onDestroy = function() {
   this.publish(coccyx.Model.Topics.DESTROY, this);
@@ -150,9 +208,10 @@ coccyx.Model.prototype.getId = function() {
  * @param {string|number} newId The new id for this model.
  */
 coccyx.Model.prototype.setId = function(newId) {
-  if (this.id_ !== newId) {
+  if (this.id_ === void 0 || this.id_.toString() !== newId.toString()) {
+    var oldId = this.id_;
     this.id_ = newId;
-    this.publish(coccyx.Model.Topics.UPDATE_ID, this);
+    this.publish(coccyx.Model.Topics.UPDATE_ID, this, oldId);
   }
 };
 

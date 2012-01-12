@@ -37,6 +37,11 @@ coccyx.RemoteRepo = function() {
    */
   this.xhrManager_ = new goog.net.XhrManager(0, this.headers_);
 
+  /**
+   * @type {coccyx.Collection}
+   * @protected
+   */
+  this.cache = new coccyx.Collection();
 };
 goog.inherits(coccyx.RemoteRepo, coccyx.Repo);
 
@@ -70,16 +75,7 @@ coccyx.RemoteRepo.prototype.onGetAll = function(e) {
   var response =
       /** @type {Array.<Object.<string,*>>} */(this.parseResponse(e));
   if (e.target.isSuccess()) {
-    var collection = this.newCollection();
-    for (var i = 0; i < response.length; i++) {
-      var model = this.newModel();
-      var contents = response[i];
-      if (contents != null && model != null) {
-        model.setAttributes(contents);
-        collection.add(model);
-      }
-    }
-    return collection;
+    return this.collectionForParams(response);
   } else {
     throw Error(response);
   }
@@ -113,10 +109,8 @@ coccyx.RemoteRepo.prototype.get = function(opt_arg, opt_params) {
  */
 coccyx.RemoteRepo.prototype.onGet = function(e) {
   var response = this.parseResponse(e);
-  if (e.target.isSuccess()) {
-    var model = this.newModel();
-    response && model.setAttributes(response);
-    return model;
+  if (e.target.isSuccess() && response) {
+    return this.modelForParams(response);
   } else {
     throw Error(response);
   }
@@ -131,7 +125,6 @@ coccyx.RemoteRepo.prototype.save = function(model) {
   var uri = this.uriFor(model);
 
   var payload = this.serializeResource(model.toJson());
-  console.log(payload);
   var ioId = this.nextId();
   var deferred = new goog.async.Deferred();
   var method = model.isPersisted() ?
@@ -300,7 +293,7 @@ coccyx.RemoteRepo.prototype.setKey = function(key) {
 
 
 /**
- * The key for the device id attribute.
+ * The key for the model id attribute.
  * @type {string}
  * @private
  */
@@ -312,6 +305,14 @@ coccyx.RemoteRepo.prototype.idKey_ = 'id';
  */
 coccyx.RemoteRepo.prototype.setIdKey = function(key) {
   this.idKey_ = key;
+};
+
+
+/**
+ * @return {string} The id attribute key.
+ */
+coccyx.RemoteRepo.prototype.getIdKey = function() {
+  return this.idKey_;
 };
 
 
@@ -403,6 +404,60 @@ coccyx.RemoteRepo.prototype.getIdentifier = function(arg) {
  */
 coccyx.RemoteRepo.prototype.serializeParams = function(params) {
   return '';
+};
+
+
+/**
+ * @param {!Object.<string,*>} json JSON of model to insert into the cache.
+ * @return {!coccyx.Model} The resulting model.
+ */
+coccyx.RemoteRepo.prototype.modelForParams = function(json) {
+  var child = this.cache.getChild(
+      /** @type {string|number} */ (json[this.getIdKey()]));
+  if (!child) {
+    child = this.newModel();
+    child.setAttributes(json);
+    this.cache.add(child);
+  } else {
+    child.setAttributes(json);
+  }
+
+  return child;
+};
+
+
+/**
+ * Instantiates and caches a list of models based on their JSON attributes.
+ *
+ * @param {Array.<Object.<string,*>>} models The array of model json
+ *     objects.
+ * @return {coccyx.Collection} The list of model objects.
+ */
+coccyx.RemoteRepo.prototype.collectionForParams = function(models) {
+  var collection = new coccyx.Collection();
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+    model && collection.add(this.modelForParams(model));
+  }
+  return collection;
+};
+
+
+/**
+ * @param {string} id The id for the desired object.
+ * @return {coccyx.Model} An empty instantiation of the model class for this
+ *     repo or an existing model from the cache.
+ */
+coccyx.RemoteRepo.prototype.modelForId = function(id) {
+  var child = this.cache.getChild(id);
+
+  if (!child) {
+    child = this.newModel();
+    child.setId(id);
+    this.cache.add(child);
+  }
+
+  return child;
 };
 
 
