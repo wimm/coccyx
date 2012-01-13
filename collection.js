@@ -122,7 +122,7 @@ coccyx.Collection.prototype.remove = function(arg) {
     var id = (goog.typeOf(arg) === 'object') ? arg.getId() : arg;
     var child = this.getChild((/** @type {string|number} */ id));
 
-    if (!coccyx.isNullOrUndefined(id) && child) {
+    if (id != null && child) {
       goog.object.remove(this.childIndex_, child.getId());
       success = success && goog.array.remove(this.children_, child);
 
@@ -190,8 +190,7 @@ coccyx.Collection.prototype.contains = function(arg) {
   }
   var id = (goog.typeOf(arg) === 'object') ?
       arg.getId() : (/** @type {string|number} */ arg);
-  return !coccyx.isNullOrUndefined(
-      goog.object.get(this.childIndex_, id.toString()));
+  return goog.object.get(this.childIndex_, id.toString()) != null;
 };
 
 

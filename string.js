@@ -8,7 +8,7 @@ goog.provide('coccyx.string');
  * @return {boolean} whether the object is null or undefined.
  */
 coccyx.String.isNullOrEmpty = function(str) {
-  return coccyx.isNullOrUndefined(str) || /^[\s\xa0]*$/.test(str);
+  return str != null || /^[\s\xa0]*$/.test(str);
 };
 
 

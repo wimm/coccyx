@@ -167,7 +167,7 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
 coccyx.RemoteRepo.prototype.destroy = function(
     model, callback) {
 
-  if (coccyx.isNullOrUndefined(model)) {
+  if (model != null) {
     throw new Error('No object received');
   }
   var uri = this.uriFor(model);
@@ -363,7 +363,7 @@ coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
     }
   }
 
-  if (!coccyx.isNullOrUndefined(opt_action)) {
+  if (opt_action != null) {
     uri += '/' + opt_action;
   }
 

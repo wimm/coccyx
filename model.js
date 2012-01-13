@@ -46,7 +46,7 @@ coccyx.Model.prototype.setAttributes = function(obj) {
   var idKey = this.repo.getIdKey();
   var id = obj[idKey];
 
-  if (!coccyx.isNullOrUndefined(id)) {
+  if (id != null) {
     // we don't want the id to be set again below. TODO: maybe clone obj?
     delete obj[idKey];
     this.setId(id);
@@ -194,7 +194,7 @@ coccyx.Model.prototype.getRepo = function() {
  */
 coccyx.Model.prototype.getId = function() {
   //in theory id could be truthy 'false'
-  if (coccyx.isNullOrUndefined(this.id_)) {
+  if (this.id_ != null) {
     this.id_ = coccyx.Model.tempIdPrefix +
         '.' + this.idGenerator_.getNextUniqueId();
   }
@@ -222,7 +222,7 @@ coccyx.Model.prototype.setId = function(newId) {
  * @return {boolean} Whether the model has been saved.
  */
 coccyx.Model.prototype.isPersisted = function() {
-  return !coccyx.isNullOrUndefined(this.id_) &&
+  return this.id_ != null &&
       !goog.string.startsWith(this.id_.toString(), coccyx.Model.tempIdPrefix);
 };
 
