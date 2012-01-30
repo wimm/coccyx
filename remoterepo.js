@@ -11,6 +11,10 @@ goog.require('goog.net.XhrManager');
  * over a connection to a resourceful resource. Currently assumes a rails-style
  * REST url structure.
  *
+ * Additionally, the 'get' method will currently return (immediately via
+ * {goog.async.Deferred.succeed}) the cached version of the object if one
+ * exists.
+ *
  * This class wraps a goog.net.XhrManager and handles CRUD operations
  * @extends {coccyx.Repo}
  * @constructor
@@ -37,11 +41,7 @@ coccyx.RemoteRepo = function() {
    */
   this.xhrManager_ = new goog.net.XhrManager(0, this.headers_);
 
-  /**
-   * @type {coccyx.Collection}
-   * @protected
-   */
-  this.cache = new coccyx.Collection();
+  goog.base(this);
 };
 goog.inherits(coccyx.RemoteRepo, coccyx.Repo);
 
@@ -52,7 +52,7 @@ goog.inherits(coccyx.RemoteRepo, coccyx.Repo);
 coccyx.RemoteRepo.prototype.getAll = function(opt_params) {
 
   var ioId = this.nextId();
-  var deferred = new goog.async.Deferred();
+  var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
   this.xhrManager_.send(ioId, this.uriFor(null, void 0, opt_params),
       coccyx.RemoteRepo.Method.GET,
       void 0, null, null, goog.bind(deferred.callback, deferred));
@@ -85,17 +85,26 @@ coccyx.RemoteRepo.prototype.onGetAll = function(e) {
 /**
  * @inheritDoc
  */
-coccyx.RemoteRepo.prototype.get = function(opt_arg, opt_params) {
+coccyx.RemoteRepo.prototype.get = function(
+    opt_arg, opt_params, opt_forceFetch) {
+  var model;
+  if (opt_arg != null) {
+    model = this.cache.getChild(opt_arg);
+  }
+  if (model != null) {
+    return goog.async.Deferred.succeed(model);
+  } else {
+    var ioId = this.nextId();
+    var uri = this.uriFor(opt_arg);
+    var deferred =
+        new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
 
-  var ioId = this.nextId();
-  var uri = this.uriFor(opt_arg);
-  var deferred = new goog.async.Deferred();
+    this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.GET,
+        void 0, null, null, goog.bind(deferred.callback, deferred));
 
-  this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.GET,
-      void 0, null, null, goog.bind(deferred.callback, deferred));
-
-  deferred.addCallback(this.onGet, this);
-  return deferred;
+    deferred.addCallback(this.onGet, this);
+    return deferred;
+  }
 };
 
 
@@ -124,9 +133,9 @@ coccyx.RemoteRepo.prototype.save = function(model) {
 
   var uri = this.uriFor(model);
 
-  var payload = this.serializeResource(model.toJson());
+  var payload = this.serializeResource(model.toJSON());
   var ioId = this.nextId();
-  var deferred = new goog.async.Deferred();
+  var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
   var method = model.isPersisted() ?
       coccyx.RemoteRepo.Method.PUT : coccyx.RemoteRepo.Method.POST;
   console.log('Saving ' + uri);
@@ -152,7 +161,8 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
   var response = this.parseResponse(e);
 
   if (e.target.isSuccess()) {
-    response && model.setAttributes(response);
+    console.log('Saved');
+    response && model.setJSON(response);
     return model;
   } else {
     response && model.setErrors(response);
@@ -167,12 +177,9 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
 coccyx.RemoteRepo.prototype.destroy = function(
     model, callback) {
 
-  if (model != null) {
-    throw new Error('No object received');
-  }
   var uri = this.uriFor(model);
   var ioId = this.nextId();
-  var deferred = new goog.async.Deferred();
+  var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
 
   console.log('Destroying ' + uri);
 
@@ -203,6 +210,20 @@ coccyx.RemoteRepo.prototype.onDestroy = function(model, e) {
     response && model.setErrors(response);
     throw Error(response);
   }
+};
+
+
+/**
+ * Internal callback function attached to all returned deferreds that will
+ * cancel the xhrio request based on the request's id. This allows consumers
+ * to call .cancel() on the returned deferred and have that handled properly.
+ * TODO: other cleanup.
+ * @param {string} ioId The id for the request to cancel. Will be prebound
+ *     before passing this function to the deferred's constructor.
+ * @protected
+ */
+coccyx.RemoteRepo.prototype.onCancel = function(ioId) {
+  this.xhrManager_.abort(ioId);
 };
 
 
@@ -289,30 +310,6 @@ coccyx.RemoteRepo.prototype.key_;
  */
 coccyx.RemoteRepo.prototype.setKey = function(key) {
   this.key_ = key;
-};
-
-
-/**
- * The key for the model id attribute.
- * @type {string}
- * @private
- */
-coccyx.RemoteRepo.prototype.idKey_ = 'id';
-
-
-/**
- * @param {string} key The new id attribute key.
- */
-coccyx.RemoteRepo.prototype.setIdKey = function(key) {
-  this.idKey_ = key;
-};
-
-
-/**
- * @return {string} The id attribute key.
- */
-coccyx.RemoteRepo.prototype.getIdKey = function() {
-  return this.idKey_;
 };
 
 
@@ -404,60 +401,6 @@ coccyx.RemoteRepo.prototype.getIdentifier = function(arg) {
  */
 coccyx.RemoteRepo.prototype.serializeParams = function(params) {
   return '';
-};
-
-
-/**
- * @param {!Object.<string,*>} json JSON of model to insert into the cache.
- * @return {!coccyx.Model} The resulting model.
- */
-coccyx.RemoteRepo.prototype.modelForParams = function(json) {
-  var child = this.cache.getChild(
-      /** @type {string|number} */ (json[this.getIdKey()]));
-  if (!child) {
-    child = this.newModel();
-    child.setAttributes(json);
-    this.cache.add(child);
-  } else {
-    child.setAttributes(json);
-  }
-
-  return child;
-};
-
-
-/**
- * Instantiates and caches a list of models based on their JSON attributes.
- *
- * @param {Array.<Object.<string,*>>} models The array of model json
- *     objects.
- * @return {coccyx.Collection} The list of model objects.
- */
-coccyx.RemoteRepo.prototype.collectionForParams = function(models) {
-  var collection = new coccyx.Collection();
-  for (var i = 0; i < models.length; i++) {
-    var model = models[i];
-    model && collection.add(this.modelForParams(model));
-  }
-  return collection;
-};
-
-
-/**
- * @param {string} id The id for the desired object.
- * @return {coccyx.Model} An empty instantiation of the model class for this
- *     repo or an existing model from the cache.
- */
-coccyx.RemoteRepo.prototype.modelForId = function(id) {
-  var child = this.cache.getChild(id);
-
-  if (!child) {
-    child = this.newModel();
-    child.setId(id);
-    this.cache.add(child);
-  }
-
-  return child;
 };
 
 

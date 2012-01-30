@@ -21,18 +21,22 @@ goog.require('goog.ui.IdGenerator');
 
 
 /**
+ * @param {!coccyx.Repo} repo The repository to use for this object.
  * @constructor
  * @extends {goog.pubsub.PubSub}
  */
-coccyx.Model = function() {
+coccyx.Model = function(repo) {
   goog.base(this);
+  this.setRepo(repo);
 };
 goog.inherits(coccyx.Model, goog.pubsub.PubSub);
 
 
 /**
  * Generator used to generate temporary unique IDs for managing models on
- * the client side before they get persisted to the service.
+ * the client side before they get persisted to the service. NOTE: since
+ * this is an object reference on the shared prototype, it will be shared
+ * with all coccyx.Models.
  * @type {goog.ui.IdGenerator}
  * @private
  */
@@ -40,11 +44,38 @@ coccyx.Model.prototype.idGenerator_ = goog.ui.IdGenerator.getInstance();
 
 
 /**
- * @param {!Object} obj The json representation of the model's attributes.
+ * Convenience method to get a single attribute based on an unobfuscated key.
+ *
+ * @param {string} key The string of the unobfuscated attribute to fetch.
+ * @return {*} val The value of the key.
  */
-coccyx.Model.prototype.setAttributes = function(obj) {
+coccyx.Model.prototype.get = function(key) {
+  var obfKey = this.attributeKeys[key];
+  return obfKey != null ? this[obfKey] : void 0;
+};
+
+
+/**
+ * Method to change a single or group of attributes and publish the appropriate
+ * change notifications.
+ * @param {Object.<string,*>|string} arg The json-ish representation of the
+ *     model's attributes.
+ * @param {*=} opt_value The value for the given key (only if a string was
+ *     passed as the initial arg).
+ */
+coccyx.Model.prototype.set = function(arg, opt_value) {
+
+  var obj;
+
+  if (goog.typeOf(arg) === 'string') {
+    obj = {};
+    obj[arg] = opt_value;
+  } else {
+    obj = arg;
+  }
+
   var idKey = this.repo.getIdKey();
-  var id = obj[idKey];
+  var id = /** @type {string|number|undefined} */ (obj[idKey]);
 
   if (id != null) {
     // we don't want the id to be set again below. TODO: maybe clone obj?
@@ -52,17 +83,49 @@ coccyx.Model.prototype.setAttributes = function(obj) {
     this.setId(id);
   }
 
-  var updated = [];
-  // walk through the keys on the json object and use the obfuscated attribute
-  // key map to set the corresponding attribute on ourselves.
-  goog.object.forEach(obj, function(val, key, object) {
-    var obfKey = this.attributeKeys[key];
-    if (obfKey && this[obfKey] !== val) {
-      //NOTE: this is unsafe-ish, since we're ignoring types.
-      this[obfKey] = val;
-      updated.push(key);
-    }
-  }, this);
+  if (goog.typeOf(obj) === 'object') {
+    /**
+     * @type {Array.<string>}
+     */
+    var updated = [];
+
+    // walk through the keys on the json object and use the obfuscated attribute
+    // key map to set the corresponding attribute on ourselves.
+    goog.object.forEach(/** @type {Object} */ (obj),
+        function(val, key, object) {
+          var obfKey = this.attributeKeys[key];
+          if (obfKey && this[obfKey] !== val) {
+            //NOTE: this is unsafe-ish, since we're ignoring types.
+            this[obfKey] = val;
+            updated.push(key);
+          }
+        }, this);
+
+    this.change(updated);
+  }
+};
+
+
+/**
+ * Publishes a change notification for one or more optional attributes and also
+ * publishes a change notification for the model as a whole.
+ *
+ * @param {string|Array.<string>=} opt_arg The key or array of keys
+ *     that were changed, if any.
+ * @param {*=} opt_oldValue An optional old value to publish for the given key,
+ *     this is currently a no-op when arg is an array.
+ */
+coccyx.Model.prototype.change = function(opt_arg, opt_oldValue) {
+  if (goog.typeOf(opt_arg) === 'array') {
+    goog.array.forEach(/** @type {Array} */ (opt_arg), function(key) {
+      this.publish(key, this, this.get(key));
+    }, this);
+  } else if (goog.typeOf(opt_arg) === 'string') {
+    this.publish(/** @type {string} */ (opt_arg),
+        this, this.get(/** @type {string} */ (opt_arg)),
+        opt_oldValue);
+  }
+  this.publish(coccyx.Model.Topics.CHANGE, this);
 };
 
 
@@ -72,7 +135,7 @@ coccyx.Model.prototype.setAttributes = function(obj) {
  *    strings passed to the setAttributeKeys function.
  * @return {Object} the serialized json object.
  */
-coccyx.Model.prototype.toJson = function(opt_include) {
+coccyx.Model.prototype.toJSON = function(opt_include) {
 
   var json = {};
   json[this.repo.getIdKey()] = this.getId();
@@ -83,13 +146,29 @@ coccyx.Model.prototype.toJson = function(opt_include) {
     var key = keys[i];
     var obfKey = this.attributeKeys[key];
 
-    if (obfKey && this[obfKey] !== void 0) {
-      json[key] = this[obfKey];
+    if (obfKey != null && Object.prototype.hasOwnProperty.call(this, obfKey)) {
+      var val = this[obfKey];
+
+      //We can do this because 'toJSON' is in a closure compiler externs
+      if (goog.typeOf(val) === 'object' && val['toJSON'] !== void 0) {
+        val = val.toJSON();
+      }
+      json[key] = val;
     }
   }
 
   return json;
 };
+
+
+/**
+ * @param {Object.<string,*>} obj JSON-like object with desired attributes. By
+ *     default this is the same as .set, however it is necessary to separate
+ *     the two when instantiating object graphs from deep JSON structures so
+ *     that we know when to simply set an attribute or when to instantiate a new
+ *     child object.
+ */
+coccyx.Model.prototype.setJSON = coccyx.Model.prototype.set;
 
 
 /**
@@ -104,6 +183,29 @@ coccyx.Model.prototype.setAttributeKeys = function(obj) {
 
 
 /**
+ * Subscribes a function to a topic. Overrides
+ * {goog.pubsub.PubSub.prototype.subscribe} and validates that the topic is
+ * either one of the attribute keys for this object or one of the model-level
+ * topics from {coccyx.Model.Topics}.
+ *
+ * @param {string} topic Topic to subscribe to.
+ * @param {Function} fn Function to be invoked when a message is published to
+ *     the given topic.
+ * @param {Object=} opt_context Object in whose context the function is to be
+ *     called (the global scope if none).
+ * @return {number} Subscription key.
+ */
+coccyx.Model.prototype.subscribe = function(topic, fn, opt_context) {
+  if (!(topic in this.attributeKeys) && !(topic in coccyx.Model.TopicKeys) &&
+      topic !== this.getRepo().getIdKey()) {
+    throw Error('Uknown topic: ' + topic);
+  }
+
+  return goog.base(this, 'subscribe', topic, fn, opt_context);
+};
+
+
+/**
  * Uses the configured repository to persist the model. Will call validate()
  * on the model and fire the onError() handler if the model is locally invalid.
  * @return {goog.async.Deferred} The deferrable to give back to the caller.
@@ -111,13 +213,14 @@ coccyx.Model.prototype.setAttributeKeys = function(obj) {
 coccyx.Model.prototype.save = function() {
   this.setErrors(null);
   this.publish(coccyx.Model.Topics.SAVING, this);
-  var deferred = (this.validate()) ?
+  this.deferred && this.deferred.cancel();
+  this.deferred = (this.validate()) ?
       this.getRepo().save(this) :
       goog.async.Deferred.fail(this);
 
-  deferred.addCallback(this.onSave, this);
-  deferred.addErrback(this.onError, this);
-  return deferred;
+  this.deferred.addCallback(this.onSave, this);
+  this.deferred.addErrback(this.onError, this);
+  return this.deferred;
 };
 
 
@@ -127,11 +230,12 @@ coccyx.Model.prototype.save = function() {
  */
 coccyx.Model.prototype.destroy = function() {
   this.publish(coccyx.Model.Topics.DESTROYING, this);
+  this.deferred && this.deferred.cancel();
   //TODO: send validation state change notification?
-  var deferred = this.getRepo().destroy(this);
-  deferred.addCallback(this.onDestroy, this);
-  deferred.addErrback(this.onError, this);
-  return deferred;
+  this.deferred = this.getRepo().destroy(this);
+  this.deferred.addCallback(this.onDestroy, this);
+  this.deferred.addErrback(this.onError, this);
+  return this.deferred;
 };
 
 
@@ -140,7 +244,8 @@ coccyx.Model.prototype.destroy = function() {
  */
 coccyx.Model.prototype.onSave = function() {
   this.persisted = true;
-  this.publish(coccyx.Model.Topics.UPDATE, this);
+  this.publish(coccyx.Model.Topics.CHANGE, this);
+  this.publish(coccyx.Model.Topics.SAVE, this);
 };
 
 
@@ -181,6 +286,14 @@ coccyx.Model.prototype.setErrors = function(errors) {
 
 
 /**
+ * @param {coccyx.Repo} repo The repository to use for this model.
+ */
+coccyx.Model.prototype.setRepo = function(repo) {
+  this.repo = repo;
+};
+
+
+/**
  * @return {coccyx.Repo} The repository to use for this model.
  */
 coccyx.Model.prototype.getRepo = function() {
@@ -194,7 +307,7 @@ coccyx.Model.prototype.getRepo = function() {
  */
 coccyx.Model.prototype.getId = function() {
   //in theory id could be truthy 'false'
-  if (this.id_ != null) {
+  if (this.id_ == null) {
     this.id_ = coccyx.Model.tempIdPrefix +
         '.' + this.idGenerator_.getNextUniqueId();
   }
@@ -211,7 +324,7 @@ coccyx.Model.prototype.setId = function(newId) {
   if (this.id_ === void 0 || this.id_.toString() !== newId.toString()) {
     var oldId = this.id_;
     this.id_ = newId;
-    this.publish(coccyx.Model.Topics.UPDATE_ID, this, oldId);
+    this.change(this.getRepo().getIdKey(), oldId);
   }
 };
 
@@ -242,9 +355,17 @@ coccyx.Model.prototype.errors;
 
 
 /**
- * The repository to persist models. This should be set to a concrete object
- * reference for subclasses, that way each instance of the class will share
- * the repo
+ * @type {goog.async.Deferred} The currently deferred action, we want to be able
+ * to cancel this if the user has requested another action that should override
+ * the previous deferred chain
+ * @protected
+ */
+coccyx.Model.prototype.deferred;
+
+
+/**
+ * The repository to persist models. Repos are singletons, so this is typically
+ * set in the model constructor with a call to the repo's getInstance method.
  * @type {coccyx.Repo}
  * @protected;
  */
@@ -253,16 +374,26 @@ coccyx.Model.prototype.repo;
 
 /**
  * Constants for topic prefixes.
+ * //TODO: change 'update' to 'change'.
  * @enum {string}
  */
 coccyx.Model.Topics = {
-  DESTROY: 'destroy',
-  DESTROYING: 'destroying',
-  UPDATE: 'update',
-  SAVING: 'saving',
-  ERROR: 'error',
-  UPDATE_ID: 'updateId'
+  DESTROY: '_destroy',
+  DESTROYING: '_destroying',
+  CHANGE: '_change',
+  SAVING: '_saving',
+  SAVE: '_save',
+  ERROR: '_error'
 };
+
+
+/**
+ * We need to check for presence of a topic string in the topics and we
+ * want to be able to do it in O(1) timeframe, so we cache the transposed
+ * version of the topics list.
+ * @type {Object}
+ */
+coccyx.Model.TopicKeys = goog.object.transpose(coccyx.Model.Topics);
 
 
 /**

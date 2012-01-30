@@ -60,8 +60,8 @@ coccyx.Collection.prototype.addAt = function(child, index) {
   } else {
     goog.object.add(this.childIndex_, child.getId().toString(), child);
     //add model subscriptions
-    child.subscribe(coccyx.Model.Topics.UPDATE, this.onChildUpdate, this);
-    child.subscribe(coccyx.Model.Topics.UPDATE_ID, this.onChildUpdateId, this);
+    child.subscribe(coccyx.Model.Topics.CHANGE, this.onChildChange, this);
+    child.subscribe(child.getRepo().getIdKey(), this.onChildUpdateId, this);
     child.subscribe(coccyx.Model.Topics.DESTROY, this.onChildDestroy, this);
     child.subscribe(coccyx.Model.Topics.ERROR, this.onChildError, this);
   }
@@ -75,8 +75,8 @@ coccyx.Collection.prototype.addAt = function(child, index) {
 /**
  * @param {coccyx.Model} child Item that was updated.
  */
-coccyx.Collection.prototype.onChildUpdate = function(child) {
-  this.publish(coccyx.Collection.Topics.CHILD_UPDATE, this, child);
+coccyx.Collection.prototype.onChildChange = function(child) {
+  this.publish(coccyx.Collection.Topics.CHILD_CHANGE, this, child);
 };
 
 
@@ -127,9 +127,9 @@ coccyx.Collection.prototype.remove = function(arg) {
       success = success && goog.array.remove(this.children_, child);
 
       if (success) {
-        child.unsubscribe(coccyx.Model.Topics.UPDATE,
-            this.onChildUpdate, this);
-        child.unsubscribe(coccyx.Model.Topics.UPDATE_ID,
+        child.unsubscribe(coccyx.Model.Topics.CHANGE,
+            this.onChildChange, this);
+        child.unsubscribe(child.getRepo().getIdKey(),
             this.onChildUpdateId, this);
         child.unsubscribe(coccyx.Model.Topics.DESTROY,
             this.onChildDestroy, this);
@@ -214,6 +214,14 @@ coccyx.Collection.prototype.getChild = function(id) {
  */
 coccyx.Collection.prototype.getChildAt = function(index) {
   return this.children_ ? this.children_[index] || null : null;
+};
+
+
+/**
+ * @return {Array} The json-compatible array representation of this collection.
+ */
+coccyx.Collection.prototype.toJSON = function() {
+  return this.map(function(child) { return child && child.toJSON() }, this);
 };
 
 
@@ -442,11 +450,11 @@ coccyx.Collection.prototype.findIndexRight = function(f, opt_obj) {
  * @enum {string}
  */
 coccyx.Collection.Topics = {
-  REFRESH: 'refresh',
-  ADD: 'add',
-  REMOVE: 'remove',
-  CHILD_UPDATE: 'childUpdate',
-  CHILD_ERROR: 'childError'
+  REFRESH: '_refresh',
+  ADD: '_add',
+  REMOVE: '_remove',
+  CHILD_CHANGE: '_childChange',
+  CHILD_ERROR: '_childError'
 };
 
 

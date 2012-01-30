@@ -88,7 +88,7 @@ coccyx.Asset.prototype.setAttributes = function(json) {
 /**
  * @return {Object} the serialized json object.
  */
-coccyx.Asset.prototype.toJson = function() {
+coccyx.Asset.prototype.toJSON = function() {
   var json = {};
 
   json[coccyx.Asset.Keys.ID] = this.id;
