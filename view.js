@@ -26,7 +26,7 @@ goog.inherits(coccyx.View, goog.ui.Component);
  * @param {coccyx.Model} model The model.
  */
 coccyx.View.prototype.setModel = function(model) {
-  goog.base('setModel', this, model);
+  goog.base(this, 'setModel', model);
 
 };
 
@@ -38,5 +38,5 @@ coccyx.View.prototype.setModel = function(model) {
  * @return {coccyx.Model} The model.
  */
 coccyx.View.prototype.getModel = function() {
-  return /** @type {coccyx.Model} */ (goog.base('getModel', this));
+  return /** @type {coccyx.Model} */ (goog.base(this, 'getModel'));
 };
