@@ -50,6 +50,10 @@ coccyx.Model.prototype.idGenerator_ = goog.ui.IdGenerator.getInstance();
  * @return {*} val The value of the key.
  */
 coccyx.Model.prototype.get = function(key) {
+
+  if (key === this.getRepo().getIdKey()) {
+    return this.getId();
+  }
   var obfKey = this.attributeKeys[key];
   return obfKey != null ? this[obfKey] : void 0;
 };
