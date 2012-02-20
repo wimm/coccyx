@@ -351,7 +351,7 @@ coccyx.RemoteRepo.prototype.useRawJson = function(useRaw) {
  */
 coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
   var uri = this.baseUri;
-  var params;
+  var params = '?';
   var oid;
   if (opt_arg) {
     oid = this.getIdentifier(opt_arg);
@@ -364,6 +364,12 @@ coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
     uri += '/' + opt_action;
   }
 
+  if (opt_params) {
+    for (var key in opt_params) {
+      params += key + '=' + opt_params[key];
+    }
+  }
+
   //IE doesn't distinguish between content types when determining things like
   //the back button and caching, so we need to use a different url for ajax
   //requests to uris that have a matching html version we might have already
@@ -372,7 +378,7 @@ coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
   //TODO: make this a configurable parameter.
   uri += '.json';
 
-  return !!params ? uri + params : uri;
+  return params != '?' ? uri + params : uri;
 
 };
 
