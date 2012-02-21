@@ -248,7 +248,6 @@ coccyx.Model.prototype.destroy = function() {
  */
 coccyx.Model.prototype.onSave = function() {
   this.persisted = true;
-  this.publish(coccyx.Model.Topics.CHANGE, this);
   this.publish(coccyx.Model.Topics.SAVE, this);
 };
 
