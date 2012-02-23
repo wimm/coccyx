@@ -82,11 +82,12 @@ coccyx.Collection.prototype.onChildChange = function(child) {
 
 /**
  * @param {coccyx.Model} child Item who's id was updated.
+ * @param {string|numner} newId The new id for this child.
  * @param {string|number} oldId The old id for this child.
  */
-coccyx.Collection.prototype.onChildUpdateId = function(child, oldId) {
+coccyx.Collection.prototype.onChildUpdateId = function(child, newId, oldId) {
 
-  if (!this.contains(child)) {
+  if (!this.contains(oldId)) {
     throw Error(coccyx.Collection.Errors.NOT_OUR_CHILD);
   }
 
