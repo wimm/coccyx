@@ -1,4 +1,7 @@
 goog.provide('coccyx.View');
+//Putting this in here seems to cause some issues if you're
+//not actually defining the events anywhere.
+//goog.provide('coccyx.View.Events');
 
 goog.require('coccyx.Collection');
 goog.require('coccyx.Model');
