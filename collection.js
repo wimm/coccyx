@@ -124,7 +124,7 @@ coccyx.Collection.prototype.remove = function(arg) {
     var child = this.getChild((/** @type {string|number} */ id));
 
     if (id != null && child) {
-      goog.object.remove(this.childIndex_, child.getId());
+      success = goog.object.remove(this.childIndex_, child.getId());
       success = success && goog.array.remove(this.children_, child);
 
       if (success) {
