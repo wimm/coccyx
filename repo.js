@@ -101,11 +101,19 @@ coccyx.Repo.prototype.destroy = function(model) {
 
 
 /**
+ * @param {Function} ctor The constructor for this repo's models.
+ */
+coccyx.Repo.prototype.setModelConstructor = function(ctor) {
+  this.modelConstructor_ = ctor;
+};
+
+
+/**
  * @return {coccyx.Model} An empty instantiation of the model class for this
  *     repo.
  */
 coccyx.Repo.prototype.newModel = function() {
-  return new coccyx.Model(this);
+  return new this.modelConstructor_(this);
 };
 
 

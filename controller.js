@@ -144,11 +144,15 @@ goog.inherits(coccyx.CollectionController, coccyx.ModelController);
 /**
  * Fetches all the records for the given repository.
  * TODO: on pagination
+ * @param {coccyx.Collection=} opt_collection Optional pre-fetched collection
+ *     to use instead of requesting the index collection from the server.
  * @return {goog.async.Deferred} A deferred which may immediately return if
  *     a model is passed, or will wait until the repo fetches the model.
  */
-coccyx.CollectionController.prototype.index = function() {
-  var deferred = this.getRepo().getAll();
+coccyx.CollectionController.prototype.index = function(opt_collection) {
+  var deferred = (opt_collection == null) ? this.getRepo().getAll() :
+                 goog.async.Deferred.succeed(opt_collection);
+
   deferred.addCallback(this.onIndex, this);
   return deferred;
 };

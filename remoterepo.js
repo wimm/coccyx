@@ -165,6 +165,7 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
     response && model.setJSON(response);
     return model;
   } else {
+    console.warn('Save failed');
     response && model.setErrors(response);
     throw Error(response);
   }
@@ -236,13 +237,13 @@ coccyx.RemoteRepo.prototype.onCancel = function(ioId) {
  * @protected
  */
 coccyx.RemoteRepo.prototype.parseResponse = function(e) {
-
   //TODO: if the server returns a 500 error this doesn't handle it gracefully
   // we need to separate out the logic here for parsing the different response
   // codes differently.
   var response = (goog.string.isEmpty(e.target.getResponseText())) ?
       null : e.target.getResponseJson();
-  return response;
+  return (this.getJsonKey() === void 0) ?
+      response : response[this.getJsonKey()];
 };
 
 
@@ -259,11 +260,11 @@ coccyx.RemoteRepo.prototype.parseResponse = function(e) {
  */
 coccyx.RemoteRepo.prototype.serializeResource = function(resource) {
   var res;
-  if (this.rawJson_ || (this.key_ === void 0)) {
-    res = goog.json.serialize(j);
+  if (this.jsonKey_ === void 0) {
+    res = goog.json.serialize(resource);
   } else {
     var j = {};
-    j[this.key_] = resource;
+    j[this.jsonKey_] = resource;
     res = goog.json.serialize(j);
   }
   return res;
@@ -298,18 +299,26 @@ coccyx.RemoteRepo.prototype.baseUri;
 
 
 /**
- * The key for base URI and request wrapping.
+ * The key to use when serializing/deserializing json objects.
  * @type {string}
  * @private
  */
-coccyx.RemoteRepo.prototype.key_;
+coccyx.RemoteRepo.prototype.jsonKey_;
 
 
 /**
  * @param {string} key The new wrapper object key.
  */
-coccyx.RemoteRepo.prototype.setKey = function(key) {
-  this.key_ = key;
+coccyx.RemoteRepo.prototype.setJsonKey = function(key) {
+  this.jsonKey_ = key;
+};
+
+
+/**
+ * @return {string} The wrapper object key.
+ */
+coccyx.RemoteRepo.prototype.getJsonKey = function() {
+  return this.jsonKey_;
 };
 
 
@@ -318,22 +327,6 @@ coccyx.RemoteRepo.prototype.setKey = function(key) {
  */
 coccyx.RemoteRepo.prototype.setBaseUri = function(uri) {
   this.baseUri = uri;
-};
-
-
-/**
- * @type {boolean} Whether to send raw JSON data.
- * @private
- */
-coccyx.RemoteRepo.prototype.rawJson_ = false;
-
-
-/**
- * @param {boolean} useRaw Whether to send raw json data or wrap it in an
- *    object such as {'account':*}.
- */
-coccyx.RemoteRepo.prototype.useRawJson = function(useRaw) {
-  this.rawJson_ = useRaw;
 };
 
 

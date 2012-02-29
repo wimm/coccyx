@@ -49,6 +49,11 @@ coccyx.Collection.prototype.addAt = function(child, index) {
     throw Error(coccyx.Collection.Errors.CHILD_INDEX_OUT_OF_BOUNDS);
   }
 
+  var wasAdded = false;
+
+  // If we're adding to the end, we're not re-ordering.
+  var wasReordered = (index !== this.getCount());
+
   if (!this.childIndex_ || !this.children_) {
     this.childIndex_ = {};
     this.children_ = [];
@@ -58,6 +63,7 @@ coccyx.Collection.prototype.addAt = function(child, index) {
     goog.object.set(this.childIndex_, child.getId().toString(), child);
     goog.array.remove(this.children_, child); //we'll add it back in below
   } else {
+    wasAdded = true;
     goog.object.add(this.childIndex_, child.getId().toString(), child);
     //add model subscriptions
     child.subscribe(coccyx.Model.Topics.CHANGE, this.onChildChange, this);
@@ -68,7 +74,11 @@ coccyx.Collection.prototype.addAt = function(child, index) {
 
   goog.array.insertAt(this.children_, child, index);
 
-  this.publish(coccyx.Collection.Topics.ADD, this, child);
+  wasAdded &&
+      this.publish(coccyx.Collection.Topics.ADD, this, child, index);
+
+  wasReordered &&
+      this.publish(coccyx.Collection.Topics.REORDER, this);
 };
 
 
@@ -451,7 +461,7 @@ coccyx.Collection.prototype.findIndexRight = function(f, opt_obj) {
  * @enum {string}
  */
 coccyx.Collection.Topics = {
-  REFRESH: '_refresh',
+  REORDER: '_reorder',
   ADD: '_add',
   REMOVE: '_remove',
   CHILD_CHANGE: '_childChange',
