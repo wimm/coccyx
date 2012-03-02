@@ -359,7 +359,7 @@ coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
 
   if (opt_params) {
     for (var key in opt_params) {
-      params += key + '=' + opt_params[key];
+      params += key + '=' + opt_params[key] + '&';
     }
   }
 
