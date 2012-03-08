@@ -304,6 +304,22 @@ coccyx.Collection.prototype.map = function(f, opt_obj) {
 
 
 /**
+ * Returns a new array from a segment of an array defined by a page
+ * number and items per page.
+ *
+ * @param {number} page The page to return.
+ * @param {number} itemsPerPage The number of items per page.
+ * @return {!Array} A new array containing the items for that page.
+ */
+coccyx.Collection.prototype.page = function(page, itemsPerPage) {
+  var startIndex = (page - 1) * itemsPerPage;
+  var endIndex = startIndex + itemsPerPage;
+  return this.children_ ?
+      goog.array.slice(this.children_, startIndex, endIndex) : [];
+};
+
+
+/**
  * Passes every element of the collection into a function and accumulates the
  * result.
  *
