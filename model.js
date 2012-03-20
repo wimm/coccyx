@@ -142,7 +142,7 @@ coccyx.Model.prototype.change = function(opt_arg, opt_oldValue) {
 coccyx.Model.prototype.toJSON = function(opt_include) {
 
   var json = {};
-  json[this.repo.getIdKey()] = this.getId();
+  opt_include || (json[this.repo.getIdKey()] = this.getId());
 
   var keys = opt_include || goog.object.getKeys(this.attributeKeys);
 
@@ -276,8 +276,18 @@ coccyx.Model.prototype.onDestroy = function() {
  * to perform your own validation.
  */
 coccyx.Model.prototype.validate = function() {
-  return true;
+  this.setErrors(null);
+  this.validateInternal();
+  return this.errors == null || goog.object.isEmpty(this.errors);
 };
+
+
+/**
+ * Validates the model, setting errors on the errors object as needed.
+ * @type {function()}
+ * @protected
+ */
+coccyx.Model.prototype.validateInternal = goog.nullFunction;
 
 
 /**
@@ -288,6 +298,25 @@ coccyx.Model.prototype.setErrors = function(errors) {
   //TODO: we may need to link these directly to the model's attributes,
   // currently we're leaving it as string-based JSON.
   this.errors = errors;
+};
+
+
+/**
+ * @param {string} field The name of the field (non obfuscated).
+ * @param {string} message The error message.
+ */
+coccyx.Model.prototype.addError = function(field, message) {
+  this.errors || (this.errors = {});
+  if (this.errors[field] === void 0) {
+    this.errors[field] = message;
+  } else if (goog.isArrayLike(this.errors[field])) {
+    this.errors[field].push(message);
+  } else {
+    var errs = [];
+    errs.push(this.errors[field]);
+    errs.push(message);
+    this.errors[field] = errs;
+  }
 };
 
 

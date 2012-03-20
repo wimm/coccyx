@@ -2,6 +2,7 @@ goog.provide('coccyx.RemoteRepo');
 
 goog.require('coccyx.Model');
 goog.require('coccyx.Repo');
+goog.require('goog.debug.Logger');
 goog.require('goog.net.XhrManager');
 
 
@@ -138,7 +139,7 @@ coccyx.RemoteRepo.prototype.save = function(model) {
   var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
   var method = model.isPersisted() ?
       coccyx.RemoteRepo.Method.PUT : coccyx.RemoteRepo.Method.POST;
-  console.log('Saving ' + uri);
+  this.logger.info('Saving ' + uri);
   this.xhrManager_.send(ioId, uri, method, payload, null, null,
       goog.bind(deferred.callback, deferred));
 
@@ -161,11 +162,11 @@ coccyx.RemoteRepo.prototype.onSave = function(model, e) {
   var response = this.parseResponse(e);
 
   if (e.target.isSuccess()) {
-    console.log('Saved');
+    this.logger.info('Saved');
     response && model.setJSON(response);
     return model;
   } else {
-    console.warn('Save failed');
+    this.logger.warn('Save failed');
     response && model.setErrors(response);
     throw Error(response);
   }
@@ -182,7 +183,7 @@ coccyx.RemoteRepo.prototype.destroy = function(
   var ioId = this.nextId();
   var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
 
-  console.log('Destroying ' + uri);
+  this.logger.info('Destroying ' + uri);
 
   this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.DELETE, '', null,
       null, goog.bind(deferred.callback, deferred));

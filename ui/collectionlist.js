@@ -30,6 +30,11 @@ coccyx.ui.CollectionList = function(
    * @protected
    */
   this.childCtor = childCtor;
+
+  /**
+   * @protected
+   */
+  this.logger = goog.debug.Logger.getLogger('coccyx.ui.CollectionList');
 };
 goog.inherits(coccyx.ui.CollectionList, goog.ui.Component);
 
@@ -119,7 +124,7 @@ coccyx.ui.CollectionList.prototype.addAt = function(model, index) {
  * @param {Array.<number|string>} oldOrder The old order or records.
  */
 coccyx.ui.CollectionList.prototype.onReorder = function(collection, oldOrder) {
-  console.warn('onReorder not implemented, old order: ' + oldOrder);
+  this.logger.warn('onReorder not implemented, old order: ' + oldOrder);
 };
 
 
@@ -128,6 +133,6 @@ coccyx.ui.CollectionList.prototype.onReorder = function(collection, oldOrder) {
  * @param {coccyx.Model} model The child model to add.
  */
 coccyx.ui.CollectionList.prototype.onRemove = function(collection, model) {
-  console.warn('onRemove not implemented, removed model: ' + model);
+  this.logger.warn('onRemove not implemented, removed model: ' + model);
 };
 

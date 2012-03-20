@@ -32,6 +32,11 @@ coccyx.Repo = function() {
    */
   this.cache = new coccyx.Collection();
 
+  /**
+   * @protected
+   */
+  this.logger = goog.debug.Logger.getLogger('coccyx.Repo');
+
 };
 
 

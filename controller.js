@@ -17,6 +17,11 @@ goog.require('goog.net.XhrManager');
  */
 coccyx.Controller = function() {
   goog.base(this);
+
+  /**
+   * @protected
+   */
+  this.logger = goog.debug.Logger.getLogger('coccyx.Controller');
 };
 goog.inherits(coccyx.Controller, goog.events.EventHandler);
 
