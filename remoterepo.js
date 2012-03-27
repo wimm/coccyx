@@ -58,6 +58,7 @@ coccyx.RemoteRepo.prototype.getAll = function(opt_params) {
       coccyx.RemoteRepo.Method.GET,
       void 0, null, null, goog.bind(deferred.callback, deferred));
 
+  deferred.addCallback(this.onComplete, this);
   deferred.addCallback(this.onGetAll, this);
   return deferred;
 };
@@ -68,17 +69,17 @@ coccyx.RemoteRepo.prototype.getAll = function(opt_params) {
  * from getAll. Starts off the deferred chain by returning the collection or
  * throwing an error.
  *
- * @param {goog.events.Event} e The event object for the xhr completion.
+ * @param {Array.<Object.<string,*>>} params The parsed array of JSON-like
+ *     params.
  * @return {coccyx.Collection} The collection of models.
  * @protected
  */
-coccyx.RemoteRepo.prototype.onGetAll = function(e) {
-  var response =
-      /** @type {Array.<Object.<string,*>>} */(this.parseResponse(e));
-  if (e.target.isSuccess()) {
-    return this.collectionForParams(response);
+coccyx.RemoteRepo.prototype.onGetAll = function(params) {
+  if (params) {
+    return this.collectionForParams(params);
   } else {
-    throw Error(response);
+    this.logger.warn('no parameters received for get all request');
+    throw Error('No parameters received');
   }
 };
 
@@ -103,6 +104,7 @@ coccyx.RemoteRepo.prototype.get = function(
     this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.GET,
         void 0, null, null, goog.bind(deferred.callback, deferred));
 
+    deferred.addCallback(this.onComplete, this);
     deferred.addCallback(this.onGet, this);
     return deferred;
   }
@@ -113,16 +115,16 @@ coccyx.RemoteRepo.prototype.get = function(
  * Internal callback function that gets added to the deferred object returned
  * from get. Starts off the deferred chain by returning the model or
  * throwing an error.
- * @param {goog.events.Event} e The event object for the xhr completion.
+ * @param {Object.<string,*>} params The parsed JSON-like params.
  * @return {coccyx.Model} The parsed model.
  * @protected
  */
-coccyx.RemoteRepo.prototype.onGet = function(e) {
-  var response = this.parseResponse(e);
-  if (e.target.isSuccess() && response) {
-    return this.modelForParams(response);
+coccyx.RemoteRepo.prototype.onGet = function(params) {
+  if (params) {
+    return this.modelForParams(params);
   } else {
-    throw Error(response);
+    this.logger.warn('no parameters received for get request');
+    throw Error('No parameters received');
   }
 };
 
@@ -143,7 +145,9 @@ coccyx.RemoteRepo.prototype.save = function(model) {
   this.xhrManager_.send(ioId, uri, method, payload, null, null,
       goog.bind(deferred.callback, deferred));
 
-  deferred.addCallback(goog.bind(this.onSave, this, model));
+  deferred.addCallback(this.onComplete, this);
+  deferred.addCallback(goog.bind(this.onModelUpdated, this, model));
+  deferred.addErrback(goog.bind(this.onModelError, this, model));
 
   return deferred;
 };
@@ -154,22 +158,14 @@ coccyx.RemoteRepo.prototype.save = function(model) {
  * the appropriate method on the model depending on whether the save was
  * successful. Returns the model to the next callback in the deferral chain.
  * @param {!coccyx.Model} model The model that was operated on (prebound).
- * @param {goog.events.Event} e The event object for the xhr completion.
+ * @param {Object.<string,*>} modifiedParams The parsed JSON-like params.
  * @return {coccyx.Model} the modified model.
  * @protected
  */
-coccyx.RemoteRepo.prototype.onSave = function(model, e) {
-  var response = this.parseResponse(e);
-
-  if (e.target.isSuccess()) {
-    this.logger.info('Saved');
-    response && model.setJSON(response);
-    return model;
-  } else {
-    this.logger.warn('Save failed');
-    response && model.setErrors(response);
-    throw Error(response);
-  }
+coccyx.RemoteRepo.prototype.onModelUpdated = function(model, modifiedParams) {
+  this.logger.info('Saved');
+  modifiedParams && model.setJSON(modifiedParams);
+  return model;
 };
 
 
@@ -188,30 +184,24 @@ coccyx.RemoteRepo.prototype.destroy = function(
   this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.DELETE, '', null,
       null, goog.bind(deferred.callback, deferred));
 
+  deferred.addCallback(this.onComplete, this);
   deferred.addCallback(goog.bind(this.onDestroy, this, model));
+  deferred.addErrback(goog.bind(this.onModelError, this, model));
 
   return deferred;
 };
 
 
 /**
- * Internal callback function that receives the xhr completion event and calls
- * the appropriate method on the model depending on whether the save was
- * successful.
+ * Internal callback function that basically just returns the model on success
+ * so that downstream callbacks get a handle on the model that was destroyed.
  * @param {!coccyx.Model} model The model that was operated on (prebound).
- * @param {goog.events.Event} e The event object for the xhr completion.
  * @return {coccyx.Model} the model that was destroyed.
  * @protected
  */
-coccyx.RemoteRepo.prototype.onDestroy = function(model, e) {
-  var response = this.parseResponse(e);
-
-  if (e.target.isSuccess()) {
-    return model;
-  } else {
-    response && model.setErrors(response);
-    throw Error(response);
-  }
+coccyx.RemoteRepo.prototype.onDestroy = function(model) {
+  this.logger.info('Destroyed model id:' + model.getId());
+  return model;
 };
 
 
@@ -230,22 +220,67 @@ coccyx.RemoteRepo.prototype.onCancel = function(ioId) {
 
 
 /**
- * Internal callback function that receives the xhr completion event and parses
- * the resulting JSON.
+ * Internal callback that kicks off the callback/errback chain by inspecting
+ * the response from the server. Also will trigger an Application-level auth
+ * exception on particular
  * @param {goog.events.Event} e The event object for the xhr completion.
  * @return {Object.<string,*>} The resulting JSON object, could be errors or
  *     the JSON representation of the model or array of models.
  * @protected
  */
-coccyx.RemoteRepo.prototype.parseResponse = function(e) {
-  //TODO: if the server returns a 500 error this doesn't handle it gracefully
-  // we need to separate out the logic here for parsing the different response
-  // codes differently.
-  var response = (goog.string.isEmpty(e.target.getResponseText())) ?
-      null : e.target.getResponseJson();
-  return (this.getJsonKey() === void 0) ?
-      response : response[this.getJsonKey()];
+coccyx.RemoteRepo.prototype.onComplete = function(e) {
+  this.logger.info('request complete');
+  var responseText = e.target.getResponseText();
+  if (e.target.isSuccess()) {
+    return (goog.string.isEmpty(responseText)) ?
+        null : e.target.getResponseJson();
+  } else {
+    var responseCode = e.target.getStatus();
+    switch (responseCode) {
+      case goog.net.HttpStatus.UNAUTHORIZED:
+        this.onAuthError(e);
+        throw Error(responseText);
+        break;
+      default:
+        throw Error(responseText);
+    }
+  }
 };
+
+
+/**
+ * Internal errback that takes an exception passed by the onComplete callback
+ * and attempts to parse json errors off the message and attach them to the
+ * prebound model object.
+ * @param {coccyx.Model} model The model to assign errors to.
+ * @param {Error} err The error object.
+ * @return {Error} The re-thrown error so that it's passed along.
+ * @protected
+ */
+coccyx.RemoteRepo.prototype.onModelError = function(model, err) {
+  var errors = null;
+
+  /** @preserveTry */
+  try {
+    errors = goog.json.parse(err.message);
+  } catch (ex) {
+  }
+
+  errors && model.setErrors(errors);
+
+  throw err;
+};
+
+
+/**
+ * We need to be able to deal with authentication errors outside the normal
+ * callback/deferred scope. In most cases, this is a true failure and we need
+ * to have the application handle this for us, but that should be determined
+ * by each custom repository. The default just re-throws the passed exception.
+ * subclasses should override this to deal with auth exceptions as they want.
+ * @param {goog.events.Event} e The event object for the xhr completion.
+ */
+coccyx.RemoteRepo.prototype.onAuthError = goog.nullFunction;
 
 
 /**
