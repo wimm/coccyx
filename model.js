@@ -50,10 +50,6 @@ coccyx.Model.prototype.idGenerator_ = goog.ui.IdGenerator.getInstance();
  * @return {*} val The value of the key.
  */
 coccyx.Model.prototype.get = function(key) {
-
-  if (key === this.getRepo().getIdKey()) {
-    return this.getId();
-  }
   var obfKey = this.attributeKeys[key];
   return obfKey != null ? this[obfKey] : void 0;
 };
@@ -78,20 +74,12 @@ coccyx.Model.prototype.set = function(arg, opt_value) {
     obj = arg;
   }
 
-  var idKey = this.repo.getIdKey();
-  var id = /** @type {string|number|undefined} */ (obj[idKey]);
-
-  if (id != null) {
-    // we don't want the id to be set again below. TODO: maybe clone obj?
-    delete obj[idKey];
-    this.setId(id);
-  }
-
   if (goog.typeOf(obj) === 'object') {
     /**
      * @type {Array.<string>}
      */
     var updated = [];
+    var oldVals = [];
 
     // walk through the keys on the json object and use the obfuscated attribute
     // key map to set the corresponding attribute on ourselves.
@@ -99,13 +87,14 @@ coccyx.Model.prototype.set = function(arg, opt_value) {
         function(val, key, object) {
           var obfKey = this.attributeKeys[key];
           if (obfKey && this[obfKey] !== val) {
+            oldVals.push(this[obfKey]);
             //NOTE: this is unsafe-ish, since we're ignoring types.
             this[obfKey] = val;
             updated.push(key);
           }
         }, this);
 
-    this.change(updated);
+    this.change(updated, oldVals);
   }
 };
 
@@ -114,22 +103,26 @@ coccyx.Model.prototype.set = function(arg, opt_value) {
  * Publishes a change notification for one or more optional attributes and also
  * publishes a change notification for the model as a whole.
  *
- * @param {string|Array.<string>=} opt_arg The key or array of keys
+ * @param {string|Array.<string>} arg The key or array of keys
  *     that were changed, if any.
- * @param {*=} opt_oldValue An optional old value to publish for the given key,
- *     this is currently a no-op when arg is an array.
+ * @param {*|Array.<*>} oldValue An optional old value or list of old
+ *     values to publish for the given key.
  */
-coccyx.Model.prototype.change = function(opt_arg, opt_oldValue) {
-  if (goog.typeOf(opt_arg) === 'array') {
-    goog.array.forEach(/** @type {Array} */ (opt_arg), function(key) {
-      this.publish(key, this, this.get(key));
-    }, this);
-  } else if (goog.typeOf(opt_arg) === 'string') {
-    this.publish(/** @type {string} */ (opt_arg),
-        this, this.get(/** @type {string} */ (opt_arg)),
-        opt_oldValue);
+coccyx.Model.prototype.change = function(arg, oldValue) {
+  if (goog.typeOf(arg) === 'array' &&
+      goog.typeOf(oldValue) === 'array') {
+    var keys = /** @type {Array} */ (arg);
+    var oldVals = /** @type {Array} */ (oldValue);
+    for (var i = 0; i < keys.length; i++) {
+      this.publish(keys[i], this, this.get(keys[i]), oldVals[i]);
+    }
+    this.publish(coccyx.Model.Topics.CHANGE, this);
+  } else if (goog.typeOf(arg) === 'string') {
+    this.publish(/** @type {string} */ (arg),
+        this, this.get(/** @type {string} */ (arg)),
+        oldValue);
+    this.publish(coccyx.Model.Topics.CHANGE, this);
   }
-  this.publish(coccyx.Model.Topics.CHANGE, this);
 };
 
 
@@ -341,26 +334,13 @@ coccyx.Model.prototype.getRepo = function() {
  * @return {string|number} id for this model.
  */
 coccyx.Model.prototype.getId = function() {
-  //in theory id could be truthy 'false'
-  if (this.id_ == null) {
-    this.id_ = coccyx.Model.tempIdPrefix +
-        '.' + this.idGenerator_.getNextUniqueId();
+  var key = this.getRepo().getIdKey();
+  if (this.get(key) == null) {
+    this.set(key, coccyx.Model.tempIdPrefix +
+        '.' + this.idGenerator_.getNextUniqueId());
   }
-  return this.id_;
-};
 
-
-/**
- * Setting the id is 'special' because we use the id to track this object
- * in collections so we need to explicitly know when the id gets changed.
- * @param {string|number} newId The new id for this model.
- */
-coccyx.Model.prototype.setId = function(newId) {
-  if (this.id_ === void 0 || this.id_.toString() !== newId.toString()) {
-    var oldId = this.id_;
-    this.id_ = newId;
-    this.change(this.getRepo().getIdKey(), oldId);
-  }
+  return /** @type {string|number} */(this.get(key));
 };
 
 
@@ -370,16 +350,9 @@ coccyx.Model.prototype.setId = function(newId) {
  * @return {boolean} Whether the model has been saved.
  */
 coccyx.Model.prototype.isPersisted = function() {
-  return this.id_ != null &&
-      !goog.string.startsWith(this.id_.toString(), coccyx.Model.tempIdPrefix);
+  return !goog.string.startsWith(
+      this.getId().toString(), coccyx.Model.tempIdPrefix);
 };
-
-
-/**
- * @type {number|string} The id for this object.
- * @private
- */
-coccyx.Model.prototype.id_;
 
 
 /**

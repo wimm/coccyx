@@ -202,7 +202,7 @@ coccyx.Repo.prototype.modelForId = function(id) {
 
   if (!child) {
     child = this.newModel();
-    child.setId(id);
+    child.set(this.getIdKey(), id);
     this.cache.add(child);
   }
 
