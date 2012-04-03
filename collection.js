@@ -23,15 +23,21 @@ goog.require('goog.structs.Collection');
  */
 coccyx.Collection = function() {
   goog.base(this);
+
+  /**
+   * @protected
+   */
+  this.logger = goog.debug.Logger.getLogger('coccyx.Collection');
 };
 goog.inherits(coccyx.Collection, goog.pubsub.PubSub);
 
 
 /**
  * @param {!coccyx.Model} model The model to add.
+ * @return {boolean} Whether the model was added.
  */
 coccyx.Collection.prototype.add = function(model) {
-  this.addAt(model, this.getCount());
+  return this.addAt(model, this.getCount());
 };
 
 
@@ -42,9 +48,9 @@ coccyx.Collection.prototype.add = function(model) {
  *
  * @param {!coccyx.Model} child The model to add.
  * @param {number} index The index to add the child at.
+ * @return {boolean} Whether the model was added.
  */
 coccyx.Collection.prototype.addAt = function(child, index) {
-
   if (index < 0 || index > this.getCount()) {
     throw Error(coccyx.Collection.Errors.CHILD_INDEX_OUT_OF_BOUNDS);
   }
@@ -61,7 +67,7 @@ coccyx.Collection.prototype.addAt = function(child, index) {
 
   if (this.contains(child)) {
     goog.object.set(this.childIndex_, child.getId().toString(), child);
-    goog.array.remove(this.children_, child); //we'll add it back in below
+    goog.array.remove(this.children_, child); //We'll add it back in below.
   } else {
     wasAdded = true;
     goog.object.add(this.childIndex_, child.getId().toString(), child);
@@ -79,6 +85,8 @@ coccyx.Collection.prototype.addAt = function(child, index) {
 
   wasReordered &&
       this.publish(coccyx.Collection.Topics.REORDER, this);
+
+  return wasAdded;
 };
 
 
@@ -232,7 +240,44 @@ coccyx.Collection.prototype.getChildAt = function(index) {
  * @return {Array} The json-compatible array representation of this collection.
  */
 coccyx.Collection.prototype.toJSON = function() {
-  return this.map(function(child) { return child && child.toJSON() }, this);
+  return this.map(function(child) { return child && child.toJSON(); }, this);
+};
+
+
+/**
+ * Sets the order of the children in the collection to a new order based on id.
+ * Will publish a reorder message only if the order has actually changed.
+ * @param {Array.<string|number>} ids An array of ids in the desired order.
+ */
+coccyx.Collection.prototype.setOrder = function(ids) {
+  if (this.getCount() !== ids.length) {
+    throw Error(coccyx.Collection.Errors.NEW_ORDER_MISMATCHED_COUNT);
+  }
+
+  var wasReordered = false;
+
+  // If we're empty, do nothing
+  if (!this.childIndex_ || !this.children_) {
+    return;
+  }
+
+  var newChildren = [];
+  for (var i = 0; i < ids.length; i++) {
+    var child = this.getChild(ids[i]);
+    if (!child) {
+      throw Error(coccyx.Collection.Errors.NOT_OUR_CHILD);
+    }
+    newChildren.push(child);
+    if (newChildren[i].getId() !== this.children_[i].getId()) {
+      wasReordered = true;
+    }
+  }
+
+  if (wasReordered) {
+    this.children_ = newChildren;
+    this.publish(coccyx.Collection.Topics.REORDER, this);
+  }
+
 };
 
 
@@ -491,5 +536,6 @@ coccyx.Collection.Topics = {
  */
 coccyx.Collection.Errors = {
   CHILD_INDEX_OUT_OF_BOUNDS: 'Child model index out of bounds',
-  NOT_OUR_CHILD: 'Child model is not a member of this collection'
+  NOT_OUR_CHILD: 'Child model is not a member of this collection',
+  NEW_ORDER_MISMATCHED_COUNT: 'New order has the wrong number of children'
 };
