@@ -26,7 +26,7 @@ goog.inherits(coccyx.View, goog.ui.Component);
  * Overrides the default component setModel method to enforce using a
  * coccyx.Model type.
  *
- * @param {coccyx.Model} model The model.
+ * @param {coccyx.Model|coccyx.Collection} model The model.
  */
 coccyx.View.prototype.setModel = function(model) {
   goog.base(this, 'setModel', model);
@@ -38,8 +38,9 @@ coccyx.View.prototype.setModel = function(model) {
  * Overrides the default component getModel to cast the result as a
  * coccyx.Model.
  *
- * @return {coccyx.Model} The model.
+ * @return {coccyx.Model|coccyx.Collection} The model.
  */
 coccyx.View.prototype.getModel = function() {
-  return /** @type {coccyx.Model} */ (goog.base(this, 'getModel'));
+  var model = goog.base(this, 'getModel');
+  return /** @type {coccyx.Collection|coccyx.Model} */ (model);
 };

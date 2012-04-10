@@ -518,6 +518,24 @@ coccyx.Collection.prototype.findIndexRight = function(f, opt_obj) {
 
 
 /**
+ * Returns sorted array defined by the compareFn.
+ * @param {Function} compareFn the comparison function that computes on key.
+ * @return {!Array.<coccyx.Model>} a sorted array of references to models.
+ */
+coccyx.Collection.prototype.sort = function(compareFn) {
+
+  // Create new array to sort in place sort.
+  var sortArray = this.map(function(el, i) {
+    return el;
+  });
+
+  goog.array.sort(sortArray, compareFn);
+
+  return sortArray;
+};
+
+
+/**
  * Constants for topic prefixes.
  * @enum {string}
  */
