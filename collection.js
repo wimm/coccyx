@@ -80,11 +80,11 @@ coccyx.Collection.prototype.addAt = function(child, index) {
 
   goog.array.insertAt(this.children_, child, index);
 
-  wasAdded &&
-      this.publish(coccyx.Collection.Topics.ADD, this, child, index);
+  if (wasAdded) {
+    this.publish(coccyx.Collection.Topics.ADD, this, child, index);
+  }
 
-  wasReordered &&
-      this.publish(coccyx.Collection.Topics.REORDER, this);
+  if (wasReordered) { this.publish(coccyx.Collection.Topics.REORDER, this); }
 
   return wasAdded;
 };
@@ -139,7 +139,7 @@ coccyx.Collection.prototype.remove = function(arg) {
   var success = false;
   if (arg) {
     var id = (goog.typeOf(arg) === 'object') ? arg.getId() : arg;
-    var child = this.getChild((/** @type {string|number} */ id));
+    var child = this.get((/** @type {string|number} */ id));
 
     if (id != null && child) {
       success = goog.object.remove(this.childIndex_, child.getId());
@@ -169,7 +169,7 @@ coccyx.Collection.prototype.remove = function(arg) {
  * @return {boolean} whether the child was successfully removed.
  */
 coccyx.Collection.prototype.removeChildAt = function(index) {
-  return this.remove(this.getChildAt(index));
+  return this.remove(this.getAt(index));
 };
 
 
@@ -219,10 +219,18 @@ coccyx.Collection.prototype.contains = function(arg) {
  * @param {string|number} id The id of the child to return.
  * @return {coccyx.Model?} the child model or null.
  */
-coccyx.Collection.prototype.getChild = function(id) {
+coccyx.Collection.prototype.get = function(id) {
   return (this.childIndex_ && id) ? (/** @type {coccyx.Model} */
       goog.object.get(this.childIndex_, id.toString())) || null : null;
 };
+
+
+/**
+ * @param {string|number} id The id of the child to return.
+ * @return {coccyx.Model?} the child model or null.
+ * @deprecated use get instead.
+ */
+coccyx.Collection.prototype.getChild = coccyx.Collection.prototype.get;
 
 
 /**
@@ -231,9 +239,17 @@ coccyx.Collection.prototype.getChild = function(id) {
  * @param {number} index The index of the child to return.
  * @return {coccyx.Model?} The child model at the index or null.
  */
-coccyx.Collection.prototype.getChildAt = function(index) {
+coccyx.Collection.prototype.getAt = function(index) {
   return this.children_ ? this.children_[index] || null : null;
 };
+
+
+/**
+ * @param {number} index The index of the child to return.
+ * @return {coccyx.Model?} The child model at the index or null.
+ * @deprecated use getAt instead.
+ */
+coccyx.Collection.prototype.getChildAt = coccyx.Collection.prototype.getAt;
 
 
 /**
@@ -263,7 +279,7 @@ coccyx.Collection.prototype.setOrder = function(ids) {
 
   var newChildren = [];
   for (var i = 0; i < ids.length; i++) {
-    var child = this.getChild(ids[i]);
+    var child = this.get(ids[i]);
     if (!child) {
       throw Error(coccyx.Collection.Errors.NOT_OUR_CHILD);
     }

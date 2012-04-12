@@ -28,6 +28,11 @@ goog.require('goog.ui.IdGenerator');
 coccyx.Model = function(repo) {
   goog.base(this);
   this.setRepo(repo);
+
+  /**
+   * @protected
+   */
+  this.logger = goog.debug.Logger.getLogger('coccyx.Model');
 };
 goog.inherits(coccyx.Model, goog.pubsub.PubSub);
 
@@ -91,6 +96,8 @@ coccyx.Model.prototype.set = function(arg, opt_value) {
             //NOTE: this is unsafe-ish, since we're ignoring types.
             this[obfKey] = val;
             updated.push(key);
+          } else if (!obfKey) {
+            this.logger.warning('unknown key: ' + key);
           }
         }, this);
 
@@ -135,9 +142,8 @@ coccyx.Model.prototype.change = function(arg, oldValue) {
 coccyx.Model.prototype.toJSON = function(opt_include) {
 
   var json = {};
-  opt_include || (json[this.repo.getIdKey()] = this.getId());
-
-  var keys = opt_include || goog.object.getKeys(this.attributeKeys);
+  var keys = opt_include ?
+      opt_include : goog.object.getKeys(this.attributeKeys);
 
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
@@ -210,7 +216,7 @@ coccyx.Model.prototype.subscribe = function(topic, fn, opt_context) {
 coccyx.Model.prototype.save = function() {
   this.setErrors(null);
   this.publish(coccyx.Model.Topics.SAVING, this);
-  this.deferred && this.deferred.cancel();
+  if (this.deferred) { this.deferred.cancel(); }
   this.deferred = (this.validate()) ?
       this.getRepo().save(this) :
       goog.async.Deferred.fail(this);
@@ -227,7 +233,7 @@ coccyx.Model.prototype.save = function() {
  */
 coccyx.Model.prototype.destroy = function() {
   this.publish(coccyx.Model.Topics.DESTROYING, this);
-  this.deferred && this.deferred.cancel();
+  if (this.deferred) { this.deferred.cancel(); }
   //TODO: send validation state change notification?
   this.deferred = this.getRepo().destroy(this);
   this.deferred.addCallback(this.onDestroy, this);
@@ -284,22 +290,27 @@ coccyx.Model.prototype.validateInternal = goog.nullFunction;
 
 
 /**
+ * Sets errors on the model based on the same string/attribute mapping used for
+ * toJSON and fromJSON. Errors objects can have either a string error message,
+ * or an array of string error messages as their value.
  * @param {Object.<string,string|Array.<string>>} errors The JSON representation
- *     of the errors for this model.
+ *     of the errors for this model. Keys must be members of this.attributeKeys.
  */
 coccyx.Model.prototype.setErrors = function(errors) {
-  //TODO: we may need to link these directly to the model's attributes,
-  // currently we're leaving it as string-based JSON.
   this.errors = errors;
 };
 
 
 /**
+ * Sets an error based on the string/attribute mapping specified in
+ * this.attributeKeys. If more than one error is set, the value of
+ * this.errors[key] is converted to an array and the new error value
+ * is appended to the array.
  * @param {string} field The name of the field (non obfuscated).
  * @param {string} message The error message.
  */
 coccyx.Model.prototype.addError = function(field, message) {
-  this.errors || (this.errors = {});
+  if (!this.errors) { this.errors = {}; }
   if (this.errors[field] === void 0) {
     this.errors[field] = message;
   } else if (goog.isArrayLike(this.errors[field])) {
@@ -336,10 +347,8 @@ coccyx.Model.prototype.getRepo = function() {
 coccyx.Model.prototype.getId = function() {
   var key = this.getRepo().getIdKey();
   if (this.get(key) == null) {
-    this.set(key, coccyx.Model.tempIdPrefix +
-        '.' + this.idGenerator_.getNextUniqueId());
+    this.set(key, coccyx.getApp().getNextId());
   }
-
   return /** @type {string|number} */(this.get(key));
 };
 
@@ -351,7 +360,7 @@ coccyx.Model.prototype.getId = function() {
  */
 coccyx.Model.prototype.isPersisted = function() {
   return !goog.string.startsWith(
-      this.getId().toString(), coccyx.Model.tempIdPrefix);
+      this.getId().toString(), coccyx.getApp().getGeneratedIdPrefix());
 };
 
 
@@ -381,8 +390,8 @@ coccyx.Model.prototype.repo;
 
 
 /**
- * Constants for topic prefixes.
- * //TODO: change 'update' to 'change'.
+ * Constants for topics. Anything in this.attributeKeys can also be used as a
+ * topic.
  * @enum {string}
  */
 coccyx.Model.Topics = {
@@ -403,10 +412,4 @@ coccyx.Model.Topics = {
  */
 coccyx.Model.TopicKeys = goog.object.transpose(coccyx.Model.Topics);
 
-
-/**
- * The prefix used to determine whether the id for this model is temporary or
- * if the model has been persisted and given an id by the repository.
- */
-coccyx.Model.tempIdPrefix = 'temp';
 

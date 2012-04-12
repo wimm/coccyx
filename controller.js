@@ -84,18 +84,24 @@ coccyx.ModelController.prototype.setModel = function(model) {
 
 
 /**
- * Fetches all the records for the given repository.
- * @param {string|number|coccyx.Model} arg The model to show or id of a model
- *     to fetch.
+ * Fetches a model matching the params for the given repository.
+ *
+ * @param {Object.<string,*>} params The parsed params from the current uri
+ *     or provided by the calling method. May be empty.
+ * @param {*=} opt_model Optional model (state) object retrieved from a popstate
+ *     event or passed in manually.
+ *
  * @return {goog.async.Deferred} A deferred which may immediately return if
  *     a model is passed, or will wait until the repo fetches the model.
  */
-coccyx.ModelController.prototype.show = function(arg) {
-  var deferred;
-  if (typeof arg == 'string' || typeof arg == 'number') {
-    deferred = this.getRepo().get(/** @type {string|number} */ (arg));
+coccyx.ModelController.prototype.show = function(params, opt_model) {
+  var deferred, oid;
+  if (opt_model) {
+    deferred = goog.async.Deferred.succeed(opt_model);
+  } else if (params && (oid = params[this.getRepo().getIdKey()])) {
+    deferred = this.getRepo().get(/** @type {string|number} */ (oid));
   } else {
-    deferred = goog.async.Deferred.succeed(arg);
+    deferred = goog.async.Deferred.fail('no args provided');
   }
 
   deferred.addCallback(this.onShow, this);
@@ -105,23 +111,32 @@ coccyx.ModelController.prototype.show = function(arg) {
 
 /**
  * @param {coccyx.Model} model The instantiated model object.
+ * @return {goog.ui.Component} The new or updated component.
  */
 coccyx.ModelController.prototype.onShow = goog.abstractMethod;
 
 
 /**
- * Fetches the given model and passes it to the onEdit function.
- * @param {string|number|coccyx.Model} arg The model to show or id of a model
- *     to fetch.
+ * Fetches a model matching the params for the given repository and passes it to
+ * the onEdit function.
+ *
+ * @param {Object.<string,*>} params The parsed params from the current uri
+ *     or provided by the calling method. May be empty.
+ * @param {*=} opt_model Optional model (state) object retrieved from a popstate
+ *     event or passed in manually.
+ *
  * @return {goog.async.Deferred} A deferred which may immediately return if
  *     a model is passed, or will wait until the repo fetches the model.
  */
-coccyx.ModelController.prototype.edit = function(arg) {
-  var deferred;
-  if (typeof arg == 'string' || typeof arg == 'number') {
-    deferred = this.getRepo().get(/** @type {string|number} */ (arg));
+coccyx.ModelController.prototype.edit = function(params, opt_model) {
+  var deferred, oid;
+
+  if (opt_model) {
+    deferred = goog.async.Deferred.succeed(opt_model);
+  } else if (params && (oid = params[this.getRepo().getIdKey()])) {
+    deferred = this.getRepo().get(/** @type {string|number} */ (oid));
   } else {
-    deferred = goog.async.Deferred.succeed(arg);
+    deferred = goog.async.Deferred.fail('no args provided');
   }
 
   deferred.addCallback(this.onEdit, this);
@@ -131,6 +146,7 @@ coccyx.ModelController.prototype.edit = function(arg) {
 
 /**
  * @param {coccyx.Model} model The instantiated model object.
+ * @return {goog.ui.Component} The new or updated component.
  */
 coccyx.ModelController.prototype.onEdit = goog.abstractMethod;
 
@@ -147,15 +163,20 @@ goog.inherits(coccyx.CollectionController, coccyx.ModelController);
 
 
 /**
- * Fetches all the records for the given repository.
  * TODO: on pagination
- * @param {coccyx.Collection=} opt_collection Optional pre-fetched collection
- *     to use instead of requesting the index collection from the server.
+ * Fetches a collection matching the params for the given repository and passes
+ * it to the onIndex function.
+ *
+ * @param {Object.<string,*>} params The parsed params from the current uri
+ *     or provided by the calling method. May be empty.
+ * @param {*=} opt_collection Optional collection (state) object retrieved from
+ *     a popstate event or passed in manually.
+ *
  * @return {goog.async.Deferred} A deferred which may immediately return if
  *     a model is passed, or will wait until the repo fetches the model.
  */
-coccyx.CollectionController.prototype.index = function(opt_collection) {
-  var deferred = (opt_collection == null) ? this.getRepo().getAll() :
+coccyx.CollectionController.prototype.index = function(params, opt_collection) {
+  var deferred = (opt_collection == null) ? this.getRepo().getAll(params) :
                  goog.async.Deferred.succeed(opt_collection);
 
   deferred.addCallback(this.onIndex, this);
@@ -166,6 +187,7 @@ coccyx.CollectionController.prototype.index = function(opt_collection) {
 /**
  * Callback added to the deferred's chain in .index().
  * @param {coccyx.Collection} collection the list of parsed resource objects.
+ * @return {goog.ui.Component} The new or updated component.
  * @protected
  */
 coccyx.CollectionController.prototype.onIndex = goog.abstractMethod;

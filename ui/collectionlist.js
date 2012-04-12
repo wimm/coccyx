@@ -46,18 +46,9 @@ coccyx.ui.CollectionList.prototype.createDom = function() {
   var dom = this.getDomHelper();
 
   this.setElementInternal(dom.createDom('ul', this.containerClass));
-};
-
-
-/**
- * @inheritDoc
- */
-coccyx.ui.CollectionList.prototype.enterDocument = function() {
-  goog.base(this, 'enterDocument');
 
   var collection = /** @type {coccyx.Collection} */ (this.getModel());
-  collection &&
-      collection.forEach(this.addAt, this);
+  if (collection) { collection.forEach(this.addAt, this); }
 };
 
 
@@ -74,9 +65,9 @@ coccyx.ui.CollectionList.prototype.setModel = function(collection) {
         goog.bind(this.onAdd, this));
     oldCol.unsubscribe(coccyx.Collection.Topics.REMOVE,
         goog.bind(this.onRemove, this));
-  }
 
-  this.removeChildren(true);
+    this.removeChildren(true);
+  }
 
   goog.base(this, 'setModel', collection);
 
@@ -111,11 +102,9 @@ coccyx.ui.CollectionList.prototype.onAdd = function(
  * @protected
  */
 coccyx.ui.CollectionList.prototype.addAt = function(model, index) {
-  if (this.isInDocument()) {
-    var widget = /** @type {goog.ui.Component} */(new this.childCtor());
-    widget.setModel(model);
-    this.addChildAt(widget, index, true);
-  }
+  var widget = /** @type {goog.ui.Component} */(new this.childCtor());
+  widget.setModel(model);
+  this.addChildAt(widget, index, true);
 };
 
 
@@ -124,7 +113,7 @@ coccyx.ui.CollectionList.prototype.addAt = function(model, index) {
  * @param {Array.<number|string>} oldOrder The old order or records.
  */
 coccyx.ui.CollectionList.prototype.onReorder = function(collection, oldOrder) {
-  this.logger.warn('onReorder not implemented, old order: ' + oldOrder);
+  this.logger.severe('onReorder not implemented, old order: ' + oldOrder);
 };
 
 
@@ -133,6 +122,6 @@ coccyx.ui.CollectionList.prototype.onReorder = function(collection, oldOrder) {
  * @param {coccyx.Model} model The child model to add.
  */
 coccyx.ui.CollectionList.prototype.onRemove = function(collection, model) {
-  this.logger.warn('onRemove not implemented, removed model: ' + model);
+  this.logger.severe('onRemove not implemented, removed model: ' + model);
 };
 

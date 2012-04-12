@@ -51,26 +51,24 @@ coccyx.Repo.prototype.getAll = function(opt_params) {
 
 
 /**
- * @param {string|number=} opt_arg The id to get by.
+ * @param {string|number} arg The id to get by.
  * @param {Object.<string,*>=} opt_params Optional params to use.
- * @param {boolean=} opt_forceFetch If true, fetches the object, updating any
- *     cached copies.
+ * @param {boolean=} opt_forceFetch If true, fetches the object from
+ *     storage/server, updating any cached copies.
  * @return {goog.async.Deferred} A deferred object representing this request,
  *     the deferred callback will return a single coccyx Model object.
  */
 coccyx.Repo.prototype.get = function(
-    opt_arg, opt_params, opt_forceFetch) {
+    arg, opt_params, opt_forceFetch) {
 
-  var model;
+  //opt_forceFetch is ignored since we're local only.
 
-  if (opt_arg != null) {
-    model = this.cache.getChild(opt_arg);
-  }
+  var model = this.cache.get(arg);
 
   if (model != null) {
     return goog.async.Deferred.succeed(model);
   } else {
-    return goog.async.Deferred.fail('could not find ' + opt_arg);
+    return goog.async.Deferred.fail('could not find ' + arg);
   }
 };
 
@@ -161,7 +159,7 @@ coccyx.Repo.prototype.getIdKey = function() {
  * @return {!coccyx.Model} The resulting model.
  */
 coccyx.Repo.prototype.modelForParams = function(params) {
-  var child = this.cache.getChild(
+  var child = this.cache.get(
       /** @type {string|number} */ (params[this.getIdKey()]));
   if (!child) {
     child = this.newModel();
@@ -184,9 +182,13 @@ coccyx.Repo.prototype.modelForParams = function(params) {
  */
 coccyx.Repo.prototype.collectionForParams = function(paramArr) {
   var collection = new coccyx.Collection();
-  for (var i = 0; i < paramArr.length; i++) {
-    var params = paramArr[i];
-    params && collection.add(this.modelForParams(params));
+  if (paramArr) {
+    for (var i = 0; i < paramArr.length; i++) {
+      var params = paramArr[i];
+      params && collection.add(this.modelForParams(params));
+    }
+  } else {
+    this.logger.warning('collectionForParams: no parameters received');
   }
   return collection;
 };
@@ -198,7 +200,7 @@ coccyx.Repo.prototype.collectionForParams = function(paramArr) {
  *     repo or an existing model from the cache.
  */
 coccyx.Repo.prototype.modelForId = function(id) {
-  var child = this.cache.getChild(id);
+  var child = this.cache.get(id);
 
   if (!child) {
     child = this.newModel();
@@ -210,3 +212,23 @@ coccyx.Repo.prototype.modelForId = function(id) {
 };
 
 
+/**
+ * Warms the cache collection with the data from the application cache (if it
+ * exists). For remote apps, this allows us to pre-cache data at page load that
+ * can be accessed via the normal repo.get() methods.
+ * @param {string} key The key for our data on the application cache.
+ */
+coccyx.Repo.prototype.warmCache = function(key) {
+  var raw = coccyx.getCached(key);
+  if (raw) {
+    if (goog.isArray(raw)) {
+      for (var i = 0; i < raw.length; i++) {
+        if (raw[i]) { this.modelForParams(raw[i]); }
+      }
+    } else if (goog.isObject(raw)) {
+      this.modelForParams(raw);
+    }
+  } else {
+    this.logger.info('no cached data found for \'' + key + '\'');
+  }
+};

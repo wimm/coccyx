@@ -2,6 +2,7 @@ goog.provide('coccyx.RemoteRepo');
 
 goog.require('coccyx.Model');
 goog.require('coccyx.Repo');
+goog.require('coccyx.csrf');
 goog.require('goog.debug.Logger');
 goog.require('goog.net.XhrManager');
 
@@ -21,27 +22,6 @@ goog.require('goog.net.XhrManager');
  * @constructor
  */
 coccyx.RemoteRepo = function() {
-
-  /**
-   * @type {goog.structs.Map}
-   * @protected
-   * @suppress {underscore}
-   */
-  this.headers_ = new goog.structs.Map(
-      {'Content-Type': 'application/json',
-        'Accept': 'application/json'}
-      );
-
-  // TODO: Need to experiment more with how rails handles refreshing this token
-  this.headers_.set('X-CSRF-Token', wimm.csrf.getToken());
-
-  /**
-   * @type {goog.net.XhrManager}
-   * @protected
-   * @suppress {underscore}
-   */
-  this.xhrManager_ = new goog.net.XhrManager(0, this.headers_);
-
   goog.base(this);
 };
 goog.inherits(coccyx.RemoteRepo, coccyx.Repo);
@@ -51,10 +31,26 @@ goog.inherits(coccyx.RemoteRepo, coccyx.Repo);
  * @inheritDoc
  */
 coccyx.RemoteRepo.prototype.getAll = function(opt_params) {
+  var uri = this.collectionRoute.uri(opt_params);
+  this.logger.info('Getting ' + uri);
+  return this.getAllInternal(uri);
+};
 
-  var ioId = this.nextId();
+
+/**
+ * Internal method accessible to child classes that gets a collection of models
+ * at a particular uri.
+ *
+ * @param {string} uri The location to get.
+ * @return {!goog.async.Deferred} A deferred object representing this request,
+ *     the deferred callback will return a single coccyx Model object.
+ * @protected
+ */
+coccyx.RemoteRepo.prototype.getAllInternal = function(uri) {
+  coccyx.getApp().startLoading();
+  var ioId = coccyx.getApp().getNextId();
   var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
-  this.xhrManager_.send(ioId, this.uriFor(null, void 0, opt_params),
+  coccyx.getApp().getXhrManager().send(ioId, uri,
       coccyx.RemoteRepo.Method.GET,
       void 0, null, null, goog.bind(deferred.callback, deferred));
 
@@ -78,7 +74,7 @@ coccyx.RemoteRepo.prototype.onGetAll = function(params) {
   if (params) {
     return this.collectionForParams(params);
   } else {
-    this.logger.warn('no parameters received for get all request');
+    this.logger.severe('no parameters received for get all request');
     throw Error('No parameters received');
   }
 };
@@ -87,27 +83,43 @@ coccyx.RemoteRepo.prototype.onGetAll = function(params) {
 /**
  * @inheritDoc
  */
-coccyx.RemoteRepo.prototype.get = function(
-    opt_arg, opt_params, opt_forceFetch) {
-  var model;
-  if (opt_arg != null) {
-    model = this.cache.getChild(opt_arg);
-  }
+coccyx.RemoteRepo.prototype.get = function(arg, opt_forceFetch) {
+  var model = opt_forceFetch ? null : this.cache.get(arg);
+
   if (model != null) {
     return goog.async.Deferred.succeed(model);
   } else {
-    var ioId = this.nextId();
-    var uri = this.uriFor(opt_arg);
-    var deferred =
-        new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
+    var params = {};
+    params[this.getIdKey()] = arg;
+    var uri = this.modelRoute.uri(params);
+    this.logger.info('Getting ' + uri);
 
-    this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.GET,
-        void 0, null, null, goog.bind(deferred.callback, deferred));
-
-    deferred.addCallback(this.onComplete, this);
-    deferred.addCallback(this.onGet, this);
-    return deferred;
+    return this.getInternal(uri);
   }
+};
+
+
+/**
+ * Internal method accessible to child classes that gets a model at a
+ * particular uri.
+ *
+ * @param {string} uri The location to get.
+ * @return {!goog.async.Deferred} A deferred object representing this request,
+ *     the deferred callback will return a single coccyx Model object.
+ * @protected
+ */
+coccyx.RemoteRepo.prototype.getInternal = function(uri) {
+  coccyx.getApp().startLoading();
+  var ioId = coccyx.getApp().getNextId();
+  var deferred =
+      new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
+
+  coccyx.getApp().getXhrManager().send(ioId, uri, coccyx.RemoteRepo.Method.GET,
+      void 0, null, null, goog.bind(deferred.callback, deferred));
+
+  deferred.addCallback(this.onComplete, this);
+  deferred.addCallback(this.onGet, this);
+  return deferred;
 };
 
 
@@ -123,7 +135,7 @@ coccyx.RemoteRepo.prototype.onGet = function(params) {
   if (params) {
     return this.modelForParams(params);
   } else {
-    this.logger.warn('no parameters received for get request');
+    this.logger.severe('no parameters received for get request');
     throw Error('No parameters received');
   }
 };
@@ -133,17 +145,42 @@ coccyx.RemoteRepo.prototype.onGet = function(params) {
  * @inheritDoc
  */
 coccyx.RemoteRepo.prototype.save = function(model) {
-
-  var uri = this.uriFor(model);
-
-  var payload = this.serializeResource(model.toJSON());
-  var ioId = this.nextId();
-  var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
+  var uri = this.modelRoute.uri(model);
   var method = model.isPersisted() ?
       coccyx.RemoteRepo.Method.PUT : coccyx.RemoteRepo.Method.POST;
+
   this.logger.info('Saving ' + uri);
-  this.xhrManager_.send(ioId, uri, method, payload, null, null,
-      goog.bind(deferred.callback, deferred));
+  return this.saveInternal(uri, model, method);
+};
+
+
+/**
+ * Internal method accessible to child classes that saves a model to a
+ * particular uri. Takes an optional payload that can be only a portion of a
+ * model, for situations where we want to only update certain attributes.
+ *
+ * @param {string} uri The location to save the payload to.
+ * @param {coccyx.Model} model The model to save, or to use for callbacks only
+ *     if a payload is provided.
+ * @param {coccyx.RemoteRepo.Method} method IE POST or PUT for
+ *     create/update.
+ * @param {Object=} opt_payload The JSON-like representation of the model or
+ *     portion of the model to save.
+ *
+ * @return {!goog.async.Deferred} A deferred object representing this request,
+ *     the deferred callback will return a single coccyx Model object.
+ * @protected
+ */
+coccyx.RemoteRepo.prototype.saveInternal = function(uri, model, method,
+                                                    opt_payload) {
+
+  coccyx.getApp().startLoading();
+  var ioId = coccyx.getApp().getNextId();
+  var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
+  var payloadString = this.serializeResource(opt_payload || model.toJSON());
+
+  coccyx.getApp().getXhrManager().send(ioId, uri, method, payloadString,
+      null, null, goog.bind(deferred.callback, deferred));
 
   deferred.addCallback(this.onComplete, this);
   deferred.addCallback(goog.bind(this.onModelUpdated, this, model));
@@ -172,16 +209,30 @@ coccyx.RemoteRepo.prototype.onModelUpdated = function(model, modifiedParams) {
 /**
  * @inheritDoc
  */
-coccyx.RemoteRepo.prototype.destroy = function(
-    model, callback) {
+coccyx.RemoteRepo.prototype.destroy = function(model) {
+  return this.destroyInternal(this.modelRoute.uri(model), model);
+};
 
-  var uri = this.uriFor(model);
-  var ioId = this.nextId();
+
+/**
+ * Internal method accessible to child classes that destroys a model at a
+ * particular uri.
+ *
+ * @param {string} uri The location to save the payload to.
+ * @param {coccyx.Model} model The model to delete.
+ * @return {!goog.async.Deferred} A deferred object representing this request,
+ *     the deferred callback will return a single coccyx Model object.
+ * @protected
+ */
+coccyx.RemoteRepo.prototype.destroyInternal = function(uri, model) {
+  coccyx.getApp().startLoading();
+  var ioId = coccyx.getApp().getNextId();
   var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
 
   this.logger.info('Destroying ' + uri);
 
-  this.xhrManager_.send(ioId, uri, coccyx.RemoteRepo.Method.DELETE, '', null,
+  coccyx.getApp().getXhrManager().send(ioId, uri,
+      coccyx.RemoteRepo.Method.DELETE, '', null,
       null, goog.bind(deferred.callback, deferred));
 
   deferred.addCallback(this.onComplete, this);
@@ -195,6 +246,11 @@ coccyx.RemoteRepo.prototype.destroy = function(
 /**
  * Internal callback function that basically just returns the model on success
  * so that downstream callbacks get a handle on the model that was destroyed.
+ *
+ * We don't need to remove the model from the cache explicitly
+ * as the cache collection is already subscribed to model destroy
+ * notifications and will do so itself.
+ *
  * @param {!coccyx.Model} model The model that was operated on (prebound).
  * @return {coccyx.Model} the model that was destroyed.
  * @protected
@@ -215,7 +271,7 @@ coccyx.RemoteRepo.prototype.onDestroy = function(model) {
  * @protected
  */
 coccyx.RemoteRepo.prototype.onCancel = function(ioId) {
-  this.xhrManager_.abort(ioId);
+  coccyx.getApp().getXhrManager().abort(ioId);
 };
 
 
@@ -229,6 +285,7 @@ coccyx.RemoteRepo.prototype.onCancel = function(ioId) {
  * @protected
  */
 coccyx.RemoteRepo.prototype.onComplete = function(e) {
+  coccyx.getApp().doneLoading();
   this.logger.info('request complete');
   var responseText = e.target.getResponseText();
   if (e.target.isSuccess()) {
@@ -276,8 +333,7 @@ coccyx.RemoteRepo.prototype.onModelError = function(model, err) {
  * We need to be able to deal with authentication errors outside the normal
  * callback/deferred scope. In most cases, this is a true failure and we need
  * to have the application handle this for us, but that should be determined
- * by each custom repository. The default just re-throws the passed exception.
- * subclasses should override this to deal with auth exceptions as they want.
+ * by each custom repository.
  * @param {goog.events.Event} e The event object for the xhr completion.
  */
 coccyx.RemoteRepo.prototype.onAuthError = goog.nullFunction;
@@ -308,34 +364,25 @@ coccyx.RemoteRepo.prototype.serializeResource = function(resource) {
 
 
 /**
- * generates an ID unique to this repo instance for use in assigning an id to
- * an XHR transaction.
- * @return {string} the next incremented id.
+ * The route to use for collection (index) requests.
+ * @type {coccyx.Route}
  * @protected
  */
-coccyx.RemoteRepo.prototype.nextId = function() {
-  return (++this.lastXhrId_).toString(); //XhrManager expects a string
-};
+coccyx.RemoteRepo.prototype.collectionRoute;
 
 
 /**
- * An incrementable counter for the request IDs.
- * @type {number}
- * @private
- */
-coccyx.RemoteRepo.prototype.lastXhrId_ = 0;
-
-
-/**
- * The base URI to use for requests.
- * @type {string}
+ * The route to use for model (get,save,destroy) requests.
+ * @type {coccyx.Route}
  * @protected
  */
-coccyx.RemoteRepo.prototype.baseUri;
+coccyx.RemoteRepo.prototype.modelRoute;
 
 
 /**
- * The key to use when serializing/deserializing json objects.
+ * The key to use when serializing json objects.
+ * NOTE: deserialization based on this key is not currently
+ * supported: JSON representation must come down raw.
  * @type {string}
  * @private
  */
@@ -359,83 +406,28 @@ coccyx.RemoteRepo.prototype.getJsonKey = function() {
 
 
 /**
- * @param {string} uri The new base URI for requests.
+ * By default, the route that getAll uses.
+ * @param {string|coccyx.Route} arg The name of the desired route or
+ *     the route itself.
  */
-coccyx.RemoteRepo.prototype.setBaseUri = function(uri) {
-  this.baseUri = uri;
+coccyx.RemoteRepo.prototype.setCollectionRoute = function(arg) {
+  this.collectionRoute = coccyx.getRoute(arg);
 };
 
 
 /**
- * TODO: I'd like to centralize the URL handling somewhere, either in soy-based
- * templates or in a more sophisticated routing mechanism.
+ * By default, the route that save, get and destroy requests go to. get()
+ * expects that the route has one param, and that param matches the idKey
+ * accessible via this.getIdKey(). Ie '/calendars/{id}'.
  *
- * The function that will produce the edit uri for this model.
- * Subclasses should override this if not using Rails-style REST.
- * @param {string|number|coccyx.Model=} opt_arg The id or object whos id to use.
- * @param {string=} opt_action The action, such as 'new'.
- * @param {Object.<string,string>=} opt_params Optional url params to be
- *     appended to the end of the query string.
- * @return {string} The uri for GET edit requests.
+ * To override this behavior, child classes should override .get(), .save() and
+ * .destroy() as needed to build the route in a custom manner.
+ *
+ * @param {string|coccyx.Route} arg The name of the desired route or
+ *     the route itself.
  */
-coccyx.RemoteRepo.prototype.uriFor = function(opt_arg, opt_action, opt_params) {
-  var uri = this.baseUri;
-  var params = '?';
-  var oid;
-  if (opt_arg) {
-    oid = this.getIdentifier(opt_arg);
-    if (oid !== void 0) {
-      uri += '/' + oid;
-    }
-  }
-
-  if (opt_action != null) {
-    uri += '/' + opt_action;
-  }
-
-  if (opt_params) {
-    for (var key in opt_params) {
-      params += key + '=' + opt_params[key] + '&';
-    }
-  }
-
-  //IE doesn't distinguish between content types when determining things like
-  //the back button and caching, so we need to use a different url for ajax
-  //requests to uris that have a matching html version we might have already
-  //loaded. Putting .json on the end of the request makes IE happy and rails
-  //just routes it back to the normal uri.
-  //TODO: make this a configurable parameter.
-  uri += '.json';
-
-  return params != '?' ? uri + params : uri;
-
-};
-
-
-/**
- * Sometimes we may want to use something other than the id of the object, like
- * the slug.
- * @param {string|number|coccyx.Model} arg The id or object whos id to use.
- * @return {string?} The identifier for the arg or undefined.
- */
-coccyx.RemoteRepo.prototype.getIdentifier = function(arg) {
-  var oid;
-  if (typeof arg == 'string' || typeof arg == 'number') {
-    oid = arg.toString();
-  } else {
-    var model = /** @type {coccyx.Model} */(arg);
-    model.isPersisted() && (oid = model.getId().toString());
-  }
-  return oid;
-};
-
-
-/**
- * @param {!Object.<string,*>} params The parameters to put on the query string.
- * @return {string} The resulting uri.
- */
-coccyx.RemoteRepo.prototype.serializeParams = function(params) {
-  return '';
+coccyx.RemoteRepo.prototype.setModelRoute = function(arg) {
+  this.modelRoute = coccyx.getRoute(arg);
 };
 
 
