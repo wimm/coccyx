@@ -87,7 +87,12 @@ coccyx.Router.prototype.match = function(uri, match) {
  */
 coccyx.Router.prototype.get = function(arg) {
   if (goog.typeOf(arg) === 'string') {
-    return this.getNamedRoutes()[/** @type {string} */(arg)];
+    var route = this.getNamedRoutes()[/** @type {string} */(arg)];
+    if (!route) {
+      this.logger.severe('Could not find route with name: ' + arg);
+    } else {
+      return route;
+    }
   } else {
     return /** @type {coccyx.Route} */(arg);
   }

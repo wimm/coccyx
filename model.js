@@ -243,30 +243,32 @@ coccyx.Model.prototype.destroy = function() {
 
 
 /**
- * Publishes an update message and flags the model as persisted.
- * @param {!coccyx.Model} model The model that was operated on (prebound).
+ * Publishes an update message..
  * @return {coccyx.Model} the modified model.
  */
-coccyx.Model.prototype.onSave = function(model) {
-  this.persisted = true;
+coccyx.Model.prototype.onSave = function() {
   this.publish(coccyx.Model.Topics.SAVE, this);
-  return model;
+  return this;
 };
 
 
 /**
  * Publishes an error message.
+ * @return {coccyx.Model} the modified model.
  */
 coccyx.Model.prototype.onError = function() {
   this.publish(coccyx.Model.Topics.ERROR, this);
+  return this;
 };
 
 
 /**
  * Publishes a destroy message.
+ * @return {coccyx.Model} the modified model.
  */
 coccyx.Model.prototype.onDestroy = function() {
   this.publish(coccyx.Model.Topics.DESTROY, this);
+  return this;
 };
 
 
