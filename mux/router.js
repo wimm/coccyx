@@ -23,11 +23,6 @@ coccyx.Router = function(opt_parent) {
   goog.base(this);
   if (opt_parent) { this.parent = opt_parent; }
   this.routes = [];
-
-  /**
-   * @protected
-   */
-  this.logger = goog.debug.Logger.getLogger('coccyx.Router');
 };
 goog.inherits(coccyx.Router, goog.pubsub.PubSub);
 
@@ -69,6 +64,14 @@ coccyx.Router.prototype.currentUri = null;
 
 
 /**
+ * @return {goog.debug.Logger} The logger for this class.
+ */
+coccyx.Router.prototype.getLogger = function() {
+  return goog.debug.Logger.getLogger('coccyx.Router');
+};
+
+
+/**
  * @param {goog.Uri} uri The location to match.
  * @param {coccyx.RouteMatch} match Reference to the match info.
  * @return {boolean} whether a route was matched.
@@ -89,7 +92,7 @@ coccyx.Router.prototype.get = function(arg) {
   if (goog.typeOf(arg) === 'string') {
     var route = this.getNamedRoutes()[/** @type {string} */(arg)];
     if (!route) {
-      this.logger.severe('Could not find route with name: ' + arg);
+      this.getLogger().severe('Could not find route with name: ' + arg);
     } else {
       return route;
     }
@@ -165,12 +168,12 @@ coccyx.Router.prototype.onPopState = function(e) {
   var match = new coccyx.RouteMatch();
   if ((!this.currentUri || (uri.toString() != this.currentUri.toString())) &&
       this.match(uri, match)) {
-    this.logger.info('routing back to \'' + match.route.name + '\'');
+    this.getLogger().info('routing back to \'' + match.route.name + '\'');
     this.execRoute(match.route, match.params);
     this.currentUri = uri;
   } else {
-    this.logger.info('no route matches \'' + this.window_.location.toString() +
-                     '\'');
+    this.getLogger().info('no route matches \'' +
+                          this.window_.location.toString() + '\'');
   }
 };
 
@@ -221,7 +224,7 @@ coccyx.Router.prototype.execRoute = function(route, opt_params, opt_state) {
  * @protected
  */
 coccyx.Router.prototype.pushRoute = function(route, opt_params, opt_state) {
-  this.logger.info('pushing uri \'' + route.uri(opt_params) + '\'');
+  this.getLogger().info('pushing uri \'' + route.uri(opt_params) + '\'');
   this.window_.history.pushState(
       opt_state || null, null, route.uri(opt_params));
 };
@@ -231,7 +234,7 @@ coccyx.Router.prototype.pushRoute = function(route, opt_params, opt_state) {
  * Takes a uri argument as a string or Uri object and either execs the matching
  * route, if it exists and routing is enabled, or sets the window location to
  * the new uri.
- * @param {goog.Uri|string} arg The uri, route or string to go to.
+ * @param {goog.Uri|string} arg The goog.Uri or string uri to go to.
  */
 coccyx.Router.prototype.goToUri = function(arg) {
   var uri = new goog.Uri(arg);
@@ -242,7 +245,7 @@ coccyx.Router.prototype.goToUri = function(arg) {
       this.currentUri = uri;
       this.goToRoute(match.route, match.params);
     } else {
-      this.logger.info('already on uri ' + uri.toString());
+      this.getLogger().info('already on uri ' + uri.toString());
     }
   } else {
     this.onRouteNotFound(uri);
@@ -264,7 +267,7 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_params, opt_state) {
   }
 
   if (route) {
-    this.logger.info('routing to \'' + route.name + '\'');
+    this.getLogger().info('routing to \'' + route.name + '\'');
     this.execRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
     this.pushRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
   } else {
@@ -282,7 +285,7 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_params, opt_state) {
  */
 coccyx.Router.prototype.onRouteNotFound = function(uri) {
   var dest = uri.toString();
-  this.logger.info('route not found, redirecting to \'' + dest + '\'');
+  this.getLogger().info('route not found, redirecting to \'' + dest + '\'');
   this.window_.location = dest;
 };
 

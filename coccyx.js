@@ -42,6 +42,26 @@ coccyx.getRoute = function(arg) {
 
 
 /**
+ * Convenience front end for {coccyx.Router.prototype.goToUri}
+ * @param {goog.Uri|string} arg The goog.Uri or string uri to go to.
+ */
+coccyx.goToUri = function(arg) {
+  coccyx.getApp().getRouter().goToUri(arg);
+};
+
+
+/**
+ * Convenience front end for {coccyx.Router.prototype.goToRoute}
+ * @param {coccyx.Route|string} arg The route or name of the desired route.
+ * @param {Object.<string, *>=} opt_params The optional key/value map of params.
+ * @param {*=} opt_state Optional model to pass directly to the method.
+ */
+coccyx.goToRoute = function(arg, opt_params, opt_state) {
+  coccyx.getApp().getRouter().goToRoute(arg, opt_params, opt_state);
+};
+
+
+/**
  * Rudimentary caching system to use at page load. Used for avoiding the
  * two-request problem on the initial page load where the app loads the frame
  * and then loads the necessary data. Instead, we pre-cache raw json-like data

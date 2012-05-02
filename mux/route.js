@@ -82,6 +82,14 @@ coccyx.Route.prototype.params = null;
 
 
 /**
+ * @return {goog.debug.Logger} The logger for this class.
+ */
+coccyx.Route.prototype.getLogger = function() {
+  return goog.debug.Logger.getLogger('coccyx.Route');
+};
+
+
+/**
  * @param {goog.Uri} uri The location of the current document.
  * @param {coccyx.RouteMatch} match Reference to the match info.
  * @return {boolean} whether a route was matched.
@@ -179,8 +187,8 @@ coccyx.Route.prototype.getHandler = function() {
  */
 coccyx.Route.prototype.setName = function(name) {
   if (this.name && this.name != '') {
-    throw Error('coccyx.Route: route already has name \'' + this.name +
-                '\' can\'t set \'' + name + '\'');
+    this.getLogger().severe('route already has name \'' + this.name +
+                       '\' can\'t set \'' + name + '\'');
   }
 
   this.name = name;
@@ -251,8 +259,8 @@ coccyx.Route.prototype.addMatcher = function(matcher) {
 coccyx.Route.prototype.addRegExpMatcher = function(template, opt_matchPrefix) {
 
   if (template.length == 0 || !goog.string.startsWith(template, '/')) {
-    throw Error('coccyx.Route: path must start with a slash, got \'' +
-                template + '\'');
+    this.getLogger().severe('path must start with a slash, got \'' +
+                       template + '\'');
   }
 
   //returns our regExp or our parents'

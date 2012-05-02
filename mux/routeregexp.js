@@ -56,7 +56,7 @@ coccyx.RouteRegExp = function(tpl, opt_matchPrefix) {
     }
 
     if (name == '' || patt == '') {
-      throw Error('coccyx.RouteRegExp: missing name or pattern in ' +
+      this.logger.severe('missing name or pattern in ' +
           subTemplate);
     }
 
@@ -77,6 +77,7 @@ coccyx.RouteRegExp = function(tpl, opt_matchPrefix) {
   if (endSlash) { this.reverse += '/'; }
 
   this.regExp = new RegExp(pattern);
+
 };
 
 
@@ -112,6 +113,14 @@ coccyx.RouteRegExp.prototype.paramRegExps;
 
 
 /**
+ * @return {goog.debug.Logger} The logger for this class.
+ */
+coccyx.RouteRegExp.prototype.getLogger = function() {
+  return goog.debug.Logger.getLogger('coccyx.RouteRegExp');
+};
+
+
+/**
  * @param {goog.Uri} uri The location to match.
  * @param {coccyx.RouteMatch} match Reference to the match info.
  * @return {boolean} whether the loc was matched.
@@ -127,12 +136,11 @@ coccyx.RouteRegExp.prototype.match = function(uri, match) {
  * @return {string} The built URI.
  */
 coccyx.RouteRegExp.prototype.uri = function(opt_arg) {
-
   if (this.paramNames.length === 0) {
     return this.template;
   } else if (!opt_arg) {
-    throw Error('coccyx.RouteRegExp: no params provided, expected ' +
-                this.paramNames.length);
+    this.getLogger().severe('no params provided, expected ' +
+                       this.paramNames.length);
   }
 
   var urlValues = [];
@@ -141,9 +149,9 @@ coccyx.RouteRegExp.prototype.uri = function(opt_arg) {
     val = (opt_arg instanceof coccyx.Model) ?
         opt_arg.get(this.paramNames[i]) :
         opt_arg[this.paramNames[i]];
-    if (val === undefined) {
-      throw Error('coccyx.RouteRegExp: missing route variable \'' +
-                  this.paramNames[i] + '\'');
+    if (val === void 0) {
+      this.getLogger().severe('missing route variable \'' +
+                         this.paramNames[i] + '\'');
     }
     urlValues[i] = val.toString();
   }
@@ -163,8 +171,8 @@ coccyx.RouteRegExp.prototype.uri = function(opt_arg) {
           opt_arg.get(this.paramNames[i]) :
           opt_arg[this.paramNames[i]];
       if (! val.toString().match(this.paramRegExps[i])) {
-        throw Error(
-            'coccyx.RouteRegExp: variable \'' + val.toString() +
+        this.getLogger().severe(
+            'variable \'' + val.toString() +
             '\' does not match, expected ' + this.paramRegExps[i].toString());
       }
     }
@@ -197,14 +205,16 @@ coccyx.RouteRegExp.getBraceIndices = function(template) {
         if (level == 0) {
           indices.push(idx, i + 1);
         } else if (level < 0) {
-          throw Error('coccyx.RouteRegExp: unbalanced braces in: ' + template);
+          coccyx.RouteRegExp.prototype.getLogger().severe(
+              'unbalanced braces in: ' + template);
         }
         break;
     }
   }
 
   if (level != 0) {
-    throw Error('coccyx.RouteRegExp: unbalanced braces in: ' + template);
+    coccyx.RouteRegExp.prototype.getLogger().severe(
+        'unbalanced braces in: ' + template);
   }
 
   return indices;

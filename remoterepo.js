@@ -145,9 +145,15 @@ coccyx.RemoteRepo.prototype.onGet = function(params) {
  * @inheritDoc
  */
 coccyx.RemoteRepo.prototype.save = function(model) {
-  var uri = this.modelRoute.uri(model);
-  var method = model.isPersisted() ?
-      coccyx.RemoteRepo.Method.PUT : coccyx.RemoteRepo.Method.POST;
+  var uri, method;
+  if (model.isPersisted()) {
+    uri = this.modelRoute.uri(model);
+    method = coccyx.RemoteRepo.Method.PUT;
+  } else {
+    uri = this.newModelRoute ? this.newModelRoute.uri(model) :
+        this.collectionRoute.uri(model);
+    method = coccyx.RemoteRepo.Method.POST;
+  }
 
   this.logger.info('Saving ' + uri);
   return this.saveInternal(uri, model, method);
@@ -420,7 +426,7 @@ coccyx.RemoteRepo.prototype.setCollectionRoute = function(arg) {
  * expects that the route has one param, and that param matches the idKey
  * accessible via this.getIdKey(). Ie '/calendars/{id}'.
  *
- * To override this behavior, child classes should override .get(), .save() and
+ * To override this behavior, child classes should override .get(), save() and
  * .destroy() as needed to build the route in a custom manner.
  *
  * @param {string|coccyx.Route} arg The name of the desired route or
@@ -428,6 +434,19 @@ coccyx.RemoteRepo.prototype.setCollectionRoute = function(arg) {
  */
 coccyx.RemoteRepo.prototype.setModelRoute = function(arg) {
   this.modelRoute = coccyx.getRoute(arg);
+};
+
+
+/**
+ * By default, the route that save calls when the model has not yet been
+ * persisted is to do a post request to the collection route. However, if you
+ * want to override that, specify a newModelRoute, or override .save().
+ *
+ * @param {string|coccyx.Route} arg The name of the desired route or
+ *     the route itself.
+ */
+coccyx.RemoteRepo.prototype.setNewModelRoute = function(arg) {
+  this.newModelRoute = coccyx.getRoute(arg);
 };
 
 

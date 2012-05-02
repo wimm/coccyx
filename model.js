@@ -38,17 +38,6 @@ goog.inherits(coccyx.Model, goog.pubsub.PubSub);
 
 
 /**
- * Generator used to generate temporary unique IDs for managing models on
- * the client side before they get persisted to the service. NOTE: since
- * this is an object reference on the shared prototype, it will be shared
- * with all coccyx.Models.
- * @type {goog.ui.IdGenerator}
- * @private
- */
-coccyx.Model.prototype.idGenerator_ = goog.ui.IdGenerator.getInstance();
-
-
-/**
  * Convenience method to get a single attribute based on an unobfuscated key.
  *
  * @param {string} key The string of the unobfuscated attribute to fetch.
