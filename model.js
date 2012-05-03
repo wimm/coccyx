@@ -243,11 +243,9 @@ coccyx.Model.prototype.onSave = function() {
 
 /**
  * Publishes an error message.
- * @return {coccyx.Model} the modified model.
  */
 coccyx.Model.prototype.onError = function() {
   this.publish(coccyx.Model.Topics.ERROR, this);
-  return this;
 };
 
 
