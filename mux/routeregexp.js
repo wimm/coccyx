@@ -56,7 +56,7 @@ coccyx.RouteRegExp = function(tpl, opt_matchPrefix) {
     }
 
     if (name == '' || patt == '') {
-      this.logger.severe('missing name or pattern in ' +
+      this.getLogger().severe('missing name or pattern in ' +
           subTemplate);
     }
 

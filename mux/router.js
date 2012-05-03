@@ -146,7 +146,11 @@ coccyx.Router.prototype.newRoute = function() {
  */
 coccyx.Router.prototype.install = function(opt_win) {
   this.window_ = opt_win || window;
-  this.enabled_ = !!(this.window_.history && this.window_.history.pushState);
+  this.enabled_ = !!(this.window_.history && this.window_.history.pushState &&
+      window.history.replaceState && !navigator.userAgent.match(
+          /((iPod|iPhone|iPad).+\bOS\s+[1-4]|WebApps\/.+CFNetwork)/));
+  this.statePopped_ = ('state' in this.window_.history);
+  this.initialUri_ = this.window_.location.href;
 
   if (this.enabled_) {
     goog.events.listen(this.window_, goog.events.EventType.POPSTATE,
@@ -155,6 +159,9 @@ coccyx.Router.prototype.install = function(opt_win) {
     goog.events.listen(this.window_, goog.events.EventType.CLICK,
                        this.onClick, false, this);
   }
+
+  // NOTE: the matching handler will be executed via setTimeout, not right now.
+  this.goToUri(this.window_.location.href);
 };
 
 
@@ -163,8 +170,14 @@ coccyx.Router.prototype.install = function(opt_win) {
  * @protected
  */
 coccyx.Router.prototype.onPopState = function(e) {
+  //ignore initial popstate from browsers we think will fire it.
+  if (!this.statePopped_ && this.window_.location.href == this.initialUri_) {
+    this.getLogger().info('ignoring what we believe to be the initial pop');
+    return;
+  }
+  this.statePopped_ = true;
   //get the matching route from window.location
-  var uri = new goog.Uri(this.window_.location.toString());
+  var uri = new goog.Uri(this.window_.location.href);
   var match = new coccyx.RouteMatch();
   if ((!this.currentUri || (uri.toString() != this.currentUri.toString())) &&
       this.match(uri, match)) {
@@ -173,7 +186,7 @@ coccyx.Router.prototype.onPopState = function(e) {
     this.currentUri = uri;
   } else {
     this.getLogger().info('no route matches \'' +
-                          this.window_.location.toString() + '\'');
+                          this.window_.location.href + '\'');
   }
 };
 
