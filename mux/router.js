@@ -146,9 +146,13 @@ coccyx.Router.prototype.newRoute = function() {
  */
 coccyx.Router.prototype.install = function(opt_win) {
   this.window_ = opt_win || window;
+
+  // Ignore non-supported browsers and iOS prior to v5
+  // regex from pjax (https://github.com/defunkt/jquery-pjax)
   this.enabled_ = !!(this.window_.history && this.window_.history.pushState &&
       window.history.replaceState && !navigator.userAgent.match(
           /((iPod|iPhone|iPad).+\bOS\s+[1-4]|WebApps\/.+CFNetwork)/));
+
   this.statePopped_ = ('state' in this.window_.history);
   this.initialUri_ = this.window_.location.href;
 
@@ -161,7 +165,7 @@ coccyx.Router.prototype.install = function(opt_win) {
   }
 
   // NOTE: the matching handler will be executed via setTimeout, not right now.
-  this.goToUri(this.window_.location.href);
+  this.execUri(this.window_.location.href);
 };
 
 
@@ -237,9 +241,11 @@ coccyx.Router.prototype.execRoute = function(route, opt_params, opt_state) {
  * @protected
  */
 coccyx.Router.prototype.pushRoute = function(route, opt_params, opt_state) {
-  this.getLogger().info('pushing uri \'' + route.uri(opt_params) + '\'');
-  this.window_.history.pushState(
-      opt_state || null, null, route.uri(opt_params));
+  if (this.enabled_) {
+    this.getLogger().info('pushing uri \'' + route.uri(opt_params) + '\'');
+    this.window_.history.pushState(
+        opt_state || null, null, route.uri(opt_params));
+  }
 };
 
 
@@ -260,8 +266,24 @@ coccyx.Router.prototype.goToUri = function(arg) {
     } else {
       this.getLogger().info('already on uri ' + uri.toString());
     }
-  } else {
+  } else if (arg !== this.window_.location.href) {
     this.onRouteNotFound(uri);
+  }
+};
+
+
+/**
+ * Executes the handler for a matching URI (if found) regardless of whether
+ * we're enabled or not. Called on page load for all browsers.
+ * @param {goog.Uri|string} arg The goog.Uri or string uri to exec.
+ */
+coccyx.Router.prototype.execUri = function(arg) {
+  var uri = new goog.Uri(arg);
+  var loc = new goog.Uri(this.window_.location);
+  var match = new coccyx.RouteMatch();
+  if (this.match(uri, match)) {
+    this.currentUri = uri;
+    this.goToRoute(match.route, match.params);
   }
 };
 
