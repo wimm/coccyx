@@ -302,11 +302,15 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_params, opt_state) {
   }
 
   if (route) {
-    this.getLogger().info('routing to \'' + route.name + '\'');
-    this.execRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
-    this.pushRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
+    if (route.buildOnly) {
+      this.onRouteNotFound(route.uri(opt_params));
+    } else {
+      this.getLogger().info('routing to \'' + route.name + '\'');
+      this.execRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
+      this.pushRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
+    }
   } else {
-    throw Error('coccyx.Router: route not found: \'' + arg + '\'');
+    this.getLogger().severe('route not found: \'' + arg + '\'');
   }
 
 };
@@ -315,11 +319,11 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_params, opt_state) {
 /**
  * By default, we just redirect to the given URL and let the server
  * figure out if this is a non-dynamic page or a bad URI.
- * @param {goog.Uri} uri The uri we couldn't match.
+ * @param {goog.Uri|string} uri The uri we couldn't match.
  * @protected
  */
 coccyx.Router.prototype.onRouteNotFound = function(uri) {
-  var dest = uri.toString();
+  var dest = goog.isString(uri) ? uri : uri.toString();
   this.getLogger().info('route not found, redirecting to \'' + dest + '\'');
   this.window_.location = dest;
 };
