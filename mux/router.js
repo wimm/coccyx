@@ -242,11 +242,9 @@ coccyx.Router.prototype.execRoute = function(route, opt_params, opt_state) {
  */
 coccyx.Router.prototype.pushRoute = function(route, opt_params, opt_state) {
   if (this.enabled_) {
-    var uri = route.uri(opt_params);
-    this.getLogger().info('pushing uri \'' + uri + '\'');
+    this.getLogger().info('pushing uri \'' + route.uri(opt_params) + '\'');
     this.window_.history.pushState(
-        opt_state || null, null, uri);
-    this.currentUri = uri;
+        opt_state || null, null, route.uri(opt_params));
   }
 };
 
@@ -263,6 +261,7 @@ coccyx.Router.prototype.goToUri = function(arg) {
   var match = new coccyx.RouteMatch();
   if (this.enabled_ && loc.hasSameDomainAs(uri) && this.match(uri, match)) {
     if (!this.currentUri || (uri.toString() != this.currentUri.toString())) {
+      this.currentUri = uri;
       this.goToRoute(match.route, match.params);
     } else {
       this.getLogger().info('already on uri ' + uri.toString());
@@ -283,6 +282,7 @@ coccyx.Router.prototype.execUri = function(arg) {
   var loc = new goog.Uri(this.window_.location);
   var match = new coccyx.RouteMatch();
   if (this.match(uri, match)) {
+    this.currentUri = uri;
     this.goToRoute(match.route, match.params);
   }
 };
