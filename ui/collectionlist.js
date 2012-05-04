@@ -63,8 +63,6 @@ coccyx.ui.CollectionList.prototype.setModel = function(collection) {
         goog.bind(this.onReorder, this));
     oldCol.unsubscribe(coccyx.Collection.Topics.ADD,
         goog.bind(this.onAdd, this));
-    oldCol.unsubscribe(coccyx.Collection.Topics.REMOVE,
-        goog.bind(this.onRemove, this));
 
     this.removeChildren(true);
   }
@@ -75,8 +73,6 @@ coccyx.ui.CollectionList.prototype.setModel = function(collection) {
       goog.bind(this.onReorder, this));
   collection.subscribe(coccyx.Collection.Topics.ADD,
       goog.bind(this.onAdd, this));
-  collection.subscribe(coccyx.Collection.Topics.REMOVE,
-      goog.bind(this.onRemove, this));
 
 
   if (this.isInDocument()) {
@@ -115,13 +111,3 @@ coccyx.ui.CollectionList.prototype.addAt = function(model, index) {
 coccyx.ui.CollectionList.prototype.onReorder = function(collection, oldOrder) {
   this.logger.severe('onReorder not implemented, old order: ' + oldOrder);
 };
-
-
-/**
- * @param {coccyx.Collection} collection Ignored.
- * @param {coccyx.Model} model The child model to add.
- */
-coccyx.ui.CollectionList.prototype.onRemove = function(collection, model) {
-  this.logger.severe('onRemove not implemented, removed model: ' + model);
-};
-
