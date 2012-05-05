@@ -57,10 +57,12 @@ coccyx.Router.prototype.strictSlash = false;
 
 
 /**
- * @type {goog.Uri} The current uri, to avoid pushing the same uri to the
- *     history or re-execing a route we're already on.
+ * @type {coccyx.RouteMatch} A RouteMatch object containing the currently
+ *     matched route and the currently matched params, used for determining
+ *     if we're already on this route without relying on the ordering of
+ *     query parameters.
  */
-coccyx.Router.prototype.currentUri = null;
+coccyx.Router.prototype.currentMatch = null;
 
 
 /**
@@ -165,7 +167,11 @@ coccyx.Router.prototype.install = function(opt_win) {
   }
 
   // NOTE: the matching handler will be executed via setTimeout, not right now.
-  this.execUri(this.window_.location.href);
+  var uri = new goog.Uri(this.window_.location.href);
+  var match = new coccyx.RouteMatch();
+  if (this.match(uri, match)) {
+    this.execMatch(match);
+  }
 };
 
 
@@ -183,11 +189,15 @@ coccyx.Router.prototype.onPopState = function(e) {
   //get the matching route from window.location
   var uri = new goog.Uri(this.window_.location.href);
   var match = new coccyx.RouteMatch();
-  if ((!this.currentUri || (uri.toString() != this.currentUri.toString())) &&
-      this.match(uri, match)) {
-    this.getLogger().info('routing back to \'' + match.route.name + '\'');
-    this.execRoute(match.route, match.params);
-    this.currentUri = uri;
+  var matched = this.match(uri, match);
+  if (matched) {
+    if (this.currentMatch && this.currentMatch.equals(match)) {
+      this.getLogger().info('already on \'' + match.route.name + '\'');
+    } else {
+      this.getLogger().info('routing back to \'' + match.route.name + '\'');
+      this.execMatch(match, e.state, true);
+      this.currentUri = uri;
+    }
   } else {
     this.getLogger().info('no route matches \'' +
                           this.window_.location.href + '\'');
@@ -213,38 +223,37 @@ coccyx.Router.prototype.onClick = function(e) {
 
 
 /**
- * Asynchronously execute the route's handler. We need to do this async because
- * the link we clicked on might get removed from the document by the handler we
- * call.
- * @param {coccyx.Route} route The route to execute.
- * @param {Object.<string, *>=} opt_params The optional key/value map of params.
- * @param {*=} opt_state The optional state that was placed on the stack.
+ * @param {coccyx.RouteMatch} match The RouteMatch object to execute.
+ * @param {*=} opt_state The optional state that was passed in.
+ * @param {boolean=} opt_suppressPush Whether to keep from pushing this route
+ *     onto the history stack.
  * @protected
  */
-coccyx.Router.prototype.execRoute = function(route, opt_params, opt_state) {
-  var params = opt_params || {};
-  //TODO: replace the current state with the slashified or unslashified uri
+coccyx.Router.prototype.execMatch = function(
+    match, opt_state, opt_suppressPush) {
+  var route = match.route;
+  var params = match.params;
+  if (route.isBuildOnly()) {
+    this.onRouteNotFound(route.uri(params));
+  } else {
+    if (this.currentMatch && this.currentMatch.equals(match)) {
+      this.getLogger().info('already on route: ' + route.uri(params));
+    } else {
+      this.currentMatch = match;
+      this.getLogger().info('routing to \'' + route.name + '\'');
 
-  this.window_.setTimeout(goog.bind(function() {
-    route.getHandler()(params, opt_state);
-    route.publish(coccyx.Route.Topics.MATCH, route, params);
-    this.publish(coccyx.Router.Topics.ROUTE_CHANGE, this, route, params);
-  }, this), 0);
-};
+      this.window_.setTimeout(goog.bind(function() {
+        route.getHandler()(params, opt_state);
+        route.publish(coccyx.Route.Topics.MATCH, route, params);
+        this.publish(coccyx.Router.Topics.ROUTE_CHANGE, this, route, params);
+      }, this), 0);
 
-
-/**
- * Asynchronously execute the route's handler.
- * @param {coccyx.Route} route The route to execute.
- * @param {Object.<string, *>=} opt_params The optional key/value map of params.
- * @param {*=} opt_state The optional state that was placed on the stack.
- * @protected
- */
-coccyx.Router.prototype.pushRoute = function(route, opt_params, opt_state) {
-  if (this.enabled_) {
-    this.getLogger().info('pushing uri \'' + route.uri(opt_params) + '\'');
-    this.window_.history.pushState(
-        opt_state || null, null, route.uri(opt_params));
+      if (!opt_suppressPush && this.enabled_) {
+        var uri = route.uri(params);
+        this.getLogger().info('pushing uri \'' + uri + '\'');
+        this.window_.history.pushState(opt_state || null, null, uri);
+      }
+    }
   }
 };
 
@@ -260,12 +269,7 @@ coccyx.Router.prototype.goToUri = function(arg) {
   var loc = new goog.Uri(this.window_.location);
   var match = new coccyx.RouteMatch();
   if (this.enabled_ && loc.hasSameDomainAs(uri) && this.match(uri, match)) {
-    if (!this.currentUri || (uri.toString() != this.currentUri.toString())) {
-      this.currentUri = uri;
-      this.goToRoute(match.route, match.params);
-    } else {
-      this.getLogger().info('already on uri ' + uri.toString());
-    }
+    this.execMatch(match);
   } else if (arg !== this.window_.location.href) {
     this.onRouteNotFound(uri);
   }
@@ -273,42 +277,49 @@ coccyx.Router.prototype.goToUri = function(arg) {
 
 
 /**
- * Executes the handler for a matching URI (if found) regardless of whether
- * we're enabled or not. Called on page load for all browsers.
- * @param {goog.Uri|string} arg The goog.Uri or string uri to exec.
- */
-coccyx.Router.prototype.execUri = function(arg) {
-  var uri = new goog.Uri(arg);
-  var loc = new goog.Uri(this.window_.location);
-  var match = new coccyx.RouteMatch();
-  if (this.match(uri, match)) {
-    this.currentUri = uri;
-    this.goToRoute(match.route, match.params);
-  }
-};
-
-
-/**
  * @param {coccyx.Route|string} arg The route or name of the desired route.
- * @param {Object.<string, *>=} opt_params The optional key/value map of params.
+ * @param {coccyx.Model|Object.<string,*>=} opt_paramArg The optional key/value
+ *     map of params or a model to pull params off of.
  * @param {*=} opt_state The optional state that was placed on the stack.
  */
-coccyx.Router.prototype.goToRoute = function(arg, opt_params, opt_state) {
+coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state) {
   var route = null;
   if (goog.typeOf(arg) === 'string') {
     route = this.get(/** @type {string} */(arg));
   } else if (goog.typeOf(arg) === 'object') {
-    route = arg;
+    route = /** @type {coccyx.Route} */ (arg);
+  }
+
+  var params;
+  params = /** @type {Object.<string,string>} */({});
+  if (opt_paramArg) {
+    var val;
+    var paramNames = route.getRegExp().paramNames;
+    // If we've been given a model, we need to grab the values off it, but even
+    // if we've been given a params array, we need to convert the params to
+    // strings so that the currentMatch.equals params comparison will work.
+    for (var i = 0; i < paramNames.length; i++) {
+      val = (opt_paramArg instanceof coccyx.Model) ?
+          opt_paramArg.get(paramNames[i]) :
+          opt_paramArg[paramNames[i]];
+      if (val !== void 0) {
+        params[paramNames[i]] = val.toString();
+      }
+    }
   }
 
   if (route) {
-    if (route.buildOnly) {
-      this.onRouteNotFound(route.uri(opt_params));
-    } else {
-      this.getLogger().info('routing to \'' + route.name + '\'');
-      this.execRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
-      this.pushRoute(/** @type {coccyx.Route} */(route), opt_params, opt_state);
+    //add any default params that haven't been parsed
+    if (route.getParams()) {
+      goog.object.forEach(route.getParams(), function(param, key) {
+        goog.object.setIfUndefined(params, key, param);
+      }, this);
     }
+    var match = new coccyx.RouteMatch();
+    match.route = route;
+    match.params = params;
+    match.handler = route.getHandler();
+    this.execMatch(match);
   } else {
     this.getLogger().severe('route not found: \'' + arg + '\'');
   }

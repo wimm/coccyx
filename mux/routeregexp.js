@@ -140,7 +140,7 @@ coccyx.RouteRegExp.prototype.uri = function(opt_arg) {
     return this.template;
   } else if (!opt_arg) {
     this.getLogger().severe('no params provided, expected ' +
-                       this.paramNames.length);
+                            this.paramNames.length);
   }
 
   var urlValues = [];
@@ -151,7 +151,7 @@ coccyx.RouteRegExp.prototype.uri = function(opt_arg) {
         opt_arg[this.paramNames[i]];
     if (val === void 0) {
       this.getLogger().severe('missing route variable \'' +
-                         this.paramNames[i] + '\'');
+                              this.paramNames[i] + '\'');
     }
     urlValues[i] = val.toString();
   }

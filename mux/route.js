@@ -4,6 +4,7 @@ goog.provide('coccyx.RouteMatcher');
 
 goog.require('coccyx.Model');
 goog.require('coccyx.RouteRegExp');
+goog.require('goog.array');
 goog.require('goog.object');
 goog.require('goog.pubsub.PubSub');
 goog.require('goog.string.format');
@@ -55,7 +56,7 @@ coccyx.Route.prototype.matchers = null;
  * @type {coccyx.RouteRegExp} Regex var manager.
  * @protected
  */
-coccyx.Route.prototype.regexp = null;
+coccyx.Route.prototype.regExp = null;
 
 
 /**
@@ -138,6 +139,15 @@ coccyx.Route.prototype.setBuildOnly = function(buildOnly) {
 
 
 /**
+ * @return {boolean} Whether the route should be matched against or
+ *     used only for constructing urls.
+ */
+coccyx.Route.prototype.isBuildOnly = function() {
+  return this.buildOnly;
+};
+
+
+/**
  * We want to be able to lazily initialize controllers when the user actually
  * needs them. An optional context parameter can be passed to act as the 'this'
  * object. However, this method also accepts a constructor for a controller that
@@ -188,7 +198,7 @@ coccyx.Route.prototype.getHandler = function() {
 coccyx.Route.prototype.setName = function(name) {
   if (this.name && this.name != '') {
     this.getLogger().severe('route already has name \'' + this.name +
-                       '\' can\'t set \'' + name + '\'');
+                            '\' can\'t set \'' + name + '\'');
   }
 
   this.name = name;
@@ -230,6 +240,15 @@ coccyx.Route.prototype.setParams = function(params) {
 
 
 /**
+ * @return {Object.<string,*>} The default (or additional) params to
+ *     return when this route is matched.
+ */
+coccyx.Route.prototype.getParams = function() {
+  return this.params;
+};
+
+
+/**
  * @param {boolean} strictSlash Whether presence or lack of trailing slashes is
  *     enforced for this route.
  * @return {coccyx.Route} Return self for chaining.
@@ -260,7 +279,7 @@ coccyx.Route.prototype.addRegExpMatcher = function(template, opt_matchPrefix) {
 
   if (template.length == 0 || !goog.string.startsWith(template, '/')) {
     this.getLogger().severe('path must start with a slash, got \'' +
-                       template + '\'');
+                            template + '\'');
   }
 
   //returns our regExp or our parents'
@@ -383,3 +402,20 @@ coccyx.RouteMatch.prototype.handler;
  */
 coccyx.RouteMatch.prototype.params = null;
 
+
+/**
+ * Determins if this match is equivalent to a given match.
+ * Checks first to see if the routes are the same object, which they must be.
+ * Next, it checks if the params hashes are both null or the same object.
+ * Then it checks each of the known keys and checks to see if the matched
+ * route's keys match the given param
+ *
+ * @param {coccyx.RouteMatch} other The RouteMatch object to compare.
+ * @return {boolean} whether the two matches have the same route and params.
+ */
+coccyx.RouteMatch.prototype.equals = function(other) {
+  return this.route === other.route &&
+      (this.params === other.params || (!!this.params && !!other.params &&
+      goog.array.every(this.route.regExp.paramNames, function(key) {
+        return this.params[key] === other.params[key]; }, this)));
+};
