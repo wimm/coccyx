@@ -183,9 +183,9 @@ coccyx.Router.prototype.onPopState = function(e) {
   //ignore initial popstate from browsers we think will fire it.
   if (!this.statePopped_ && this.window_.location.href == this.initialUri_) {
     this.getLogger().info('ignoring what we believe to be the initial pop');
+    this.statePopped_ = true;
     return;
   }
-  this.statePopped_ = true;
   //get the matching route from window.location
   var uri = new goog.Uri(this.window_.location.href);
   var match = new coccyx.RouteMatch();
@@ -225,12 +225,14 @@ coccyx.Router.prototype.onClick = function(e) {
 /**
  * @param {coccyx.RouteMatch} match The RouteMatch object to execute.
  * @param {*=} opt_state The optional state that was passed in.
- * @param {boolean=} opt_suppressPush Whether to keep from pushing this route
- *     onto the history stack.
+ * @param {boolean=} opt_suppressHistory Whether to suppress push or replace
+ *     history state calls.
+ * @param {boolean=} opt_replaceState Whether to replace the current state
+ *     instead of pushing the new state.
  * @protected
  */
 coccyx.Router.prototype.execMatch = function(
-    match, opt_state, opt_suppressPush) {
+    match, opt_state, opt_suppressHistory, opt_replaceState) {
   var route = match.route;
   var params = match.params;
   if (route.isBuildOnly()) {
@@ -248,10 +250,17 @@ coccyx.Router.prototype.execMatch = function(
         this.publish(coccyx.Router.Topics.ROUTE_CHANGE, this, route, params);
       }, this), 0);
 
-      if (!opt_suppressPush && this.enabled_) {
+      if (this.enabled_) {
         var uri = route.uri(params);
-        this.getLogger().info('pushing uri \'' + uri + '\'');
-        this.window_.history.pushState(opt_state || null, null, uri);
+        if (!!opt_suppressHistory) {
+          this.getLogger().info('suppressing \'' + uri + '\'');
+        } else if (!!opt_replaceState) {
+          this.getLogger().info('replacing with uri \'' + uri + '\'');
+          this.window_.history.replaceState(opt_state || null, null, uri);
+        } else {
+          this.getLogger().info('pushing uri \'' + uri + '\'');
+          this.window_.history.pushState(opt_state || null, null, uri);
+        }
       }
     }
   }
@@ -263,13 +272,18 @@ coccyx.Router.prototype.execMatch = function(
  * route, if it exists and routing is enabled, or sets the window location to
  * the new uri.
  * @param {goog.Uri|string} arg The goog.Uri or string uri to go to.
+ * @param {boolean=} opt_suppressHistory Whether to suppress push or replace
+ *     history state calls.
+ * @param {boolean=} opt_replaceState Whether to replace the current state
+ *     instead of pushing the new state.
  */
-coccyx.Router.prototype.goToUri = function(arg) {
+coccyx.Router.prototype.goToUri = function(
+    arg, opt_suppressHistory, opt_replaceState) {
   var uri = new goog.Uri(arg);
   var loc = new goog.Uri(this.window_.location);
   var match = new coccyx.RouteMatch();
   if (this.enabled_ && loc.hasSameDomainAs(uri) && this.match(uri, match)) {
-    this.execMatch(match);
+    this.execMatch(match, void 0, opt_suppressHistory, opt_replaceState);
   } else if (arg !== this.window_.location.href) {
     this.onRouteNotFound(uri);
   }
@@ -281,8 +295,13 @@ coccyx.Router.prototype.goToUri = function(arg) {
  * @param {coccyx.Model|Object.<string,*>=} opt_paramArg The optional key/value
  *     map of params or a model to pull params off of.
  * @param {*=} opt_state The optional state that was placed on the stack.
+ * @param {boolean=} opt_suppressHistory Whether to suppress push or replace
+ *     history state calls.
+ * @param {boolean=} opt_replaceState Whether to replace the current state
+ *     instead of pushing the new state.
  */
-coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state) {
+coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state,
+    opt_suppressHistory, opt_replaceState) {
   var route = null;
   if (goog.typeOf(arg) === 'string') {
     route = this.get(/** @type {string} */(arg));
@@ -319,7 +338,7 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state) {
     match.route = route;
     match.params = params;
     match.handler = route.getHandler();
-    this.execMatch(match);
+    this.execMatch(match, void 0, opt_suppressHistory, opt_replaceState);
   } else {
     this.getLogger().severe('route not found: \'' + arg + '\'');
   }
