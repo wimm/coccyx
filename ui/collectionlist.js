@@ -11,20 +11,20 @@ goog.require('wimm.ui.NotificationWidget');
 /**
  * A simple component that handles adding notification widgets to itself.
  * @param {Function} childCtor The constructor for child elements.
- * @param {string=} opt_containerClass An optional class to use for the
- *     container element.
+ * @param {string|Array.<string>=} opt_containerClasses An optional class or
+ *     classes to use for the container element.
  * @param {goog.dom.DomHelper=} opt_domHelper Optional DOM helper.
  * @constructor
  * @extends {goog.ui.Component}
  */
 coccyx.ui.CollectionList = function(
-    childCtor, opt_containerClass, opt_domHelper) {
+    childCtor, opt_containerClasses, opt_domHelper) {
   goog.base(this, opt_domHelper);
 
   /**
    * @protected
    */
-  this.containerClass = opt_containerClass;
+  this.containerClasses = opt_containerClasses;
 
   /**
    * @protected
@@ -45,7 +45,7 @@ goog.inherits(coccyx.ui.CollectionList, goog.ui.Component);
 coccyx.ui.CollectionList.prototype.createDom = function() {
   var dom = this.getDomHelper();
 
-  this.setElementInternal(dom.createDom('ul', this.containerClass));
+  this.setElementInternal(dom.createDom('ul', this.containerClasses));
 
   var collection = /** @type {coccyx.Collection} */ (this.getModel());
   if (collection) { collection.forEach(this.addAt, this); }

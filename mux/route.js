@@ -416,6 +416,6 @@ coccyx.RouteMatch.prototype.params = null;
 coccyx.RouteMatch.prototype.equals = function(other) {
   return this.route === other.route &&
       (this.params === other.params || (!!this.params && !!other.params &&
-      goog.array.every(this.route.regExp.paramNames, function(key) {
+      goog.array.every(this.route.getRegExp().paramNames, function(key) {
         return this.params[key] === other.params[key]; }, this)));
 };
