@@ -148,6 +148,26 @@ coccyx.Route.prototype.isBuildOnly = function() {
 
 
 /**
+ * @param {boolean} matchOnly Whether the route should be execced at page load
+ *     or if it is just used for matching nav links.
+ * @return {coccyx.Route} Return self for chaining.
+ */
+coccyx.Route.prototype.setMatchOnly = function(matchOnly) {
+  this.matchOnly = matchOnly;
+  return this.setHandler(function() { window.location = this.uri(); }, this);
+};
+
+
+/**
+ * @return {boolean} Whether the route should be execced at page load or if it
+ *     is just used for matching nav links.
+ */
+coccyx.Route.prototype.isMatchOnly = function() {
+  return this.matchOnly;
+};
+
+
+/**
  * We want to be able to lazily initialize controllers when the user actually
  * needs them. An optional context parameter can be passed to act as the 'this'
  * object. However, this method also accepts a constructor for a controller that
@@ -347,6 +367,15 @@ coccyx.Route.prototype.getNamedRoutes = function() {
     this.parent = new coccyx.Router();
   }
   return this.parent.getNamedRoutes();
+};
+
+
+/**
+ * @return {!Window} The window we're installed in. FIXME: probably doesn't
+ *     work, this is a placeholder for future multi-window functionality.
+ */
+coccyx.Route.prototype.getWindow = function() {
+  return this.parent.getWindow();
 };
 
 

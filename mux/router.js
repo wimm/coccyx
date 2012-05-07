@@ -151,26 +151,39 @@ coccyx.Router.prototype.install = function(opt_win) {
 
   // Ignore non-supported browsers and iOS prior to v5
   // regex from pjax (https://github.com/defunkt/jquery-pjax)
-  this.enabled_ = !!(this.window_.history && this.window_.history.pushState &&
+  this.enabled_ = !!(this.getWindow().history &&
+      this.getWindow().history.pushState &&
       window.history.replaceState && !navigator.userAgent.match(
           /((iPod|iPhone|iPad).+\bOS\s+[1-4]|WebApps\/.+CFNetwork)/));
 
-  this.statePopped_ = ('state' in this.window_.history);
-  this.initialUri_ = this.window_.location.href;
+  this.statePopped_ = ('state' in this.getWindow().history);
+  this.initialUri_ = this.getWindow().location.href;
 
   if (this.enabled_) {
-    goog.events.listen(this.window_, goog.events.EventType.POPSTATE,
+    goog.events.listen(this.getWindow(), goog.events.EventType.POPSTATE,
                        this.onPopState, false, this);
 
-    goog.events.listen(this.window_, goog.events.EventType.CLICK,
+    goog.events.listen(this.getWindow(), goog.events.EventType.CLICK,
                        this.onClick, false, this);
   }
 
   // NOTE: the matching handler will be executed via setTimeout, not right now.
-  var uri = new goog.Uri(this.window_.location.href);
+  var uri = new goog.Uri(this.getWindow().location.href);
   var match = new coccyx.RouteMatch();
   if (this.match(uri, match)) {
-    this.execMatch(match);
+
+    // If we have a match-only route, we don't want to execute it, since that
+    // will send us back to this page, just publish the match events.
+    if (match.route.isMatchOnly()) {
+      this.getWindow().setTimeout(goog.bind(function() {
+        match.route.publish(
+            coccyx.Route.Topics.MATCH, match.route, match.params);
+        this.publish(
+            coccyx.Router.Topics.ROUTE_CHANGE, this, match.route, match.params);
+      }, this), 0);
+    } else {
+      this.execMatch(match);
+    }
   }
 };
 
@@ -181,13 +194,14 @@ coccyx.Router.prototype.install = function(opt_win) {
  */
 coccyx.Router.prototype.onPopState = function(e) {
   //ignore initial popstate from browsers we think will fire it.
-  if (!this.statePopped_ && this.window_.location.href == this.initialUri_) {
+  if (!this.statePopped_ &&
+      this.getWindow().location.href == this.initialUri_) {
     this.getLogger().info('ignoring what we believe to be the initial pop');
     this.statePopped_ = true;
     return;
   }
   //get the matching route from window.location
-  var uri = new goog.Uri(this.window_.location.href);
+  var uri = new goog.Uri(this.getWindow().location.href);
   var match = new coccyx.RouteMatch();
   var matched = this.match(uri, match);
   if (matched) {
@@ -200,7 +214,7 @@ coccyx.Router.prototype.onPopState = function(e) {
     }
   } else {
     this.getLogger().info('no route matches \'' +
-                          this.window_.location.href + '\'');
+                          this.getWindow().location.href + '\'');
   }
 };
 
@@ -240,11 +254,13 @@ coccyx.Router.prototype.execMatch = function(
   } else {
     if (this.currentMatch && this.currentMatch.equals(match)) {
       this.getLogger().info('already on route: ' + route.uri(params));
+    } else if (route.isMatchOnly()) {
+      this.getWindow().location = match.route.uri(params);
     } else {
       this.currentMatch = match;
       this.getLogger().info('routing to \'' + route.name + '\'');
 
-      this.window_.setTimeout(goog.bind(function() {
+      this.getWindow().setTimeout(goog.bind(function() {
         route.getHandler()(params, opt_state);
         route.publish(coccyx.Route.Topics.MATCH, route, params);
         this.publish(coccyx.Router.Topics.ROUTE_CHANGE, this, route, params);
@@ -256,10 +272,10 @@ coccyx.Router.prototype.execMatch = function(
           this.getLogger().info('suppressing \'' + uri + '\'');
         } else if (!!opt_replaceState) {
           this.getLogger().info('replacing with uri \'' + uri + '\'');
-          this.window_.history.replaceState(opt_state || null, null, uri);
+          this.getWindow().history.replaceState(opt_state || null, '', uri);
         } else {
           this.getLogger().info('pushing uri \'' + uri + '\'');
-          this.window_.history.pushState(opt_state || null, null, uri);
+          this.getWindow().history.pushState(opt_state || null, '', uri);
         }
       }
     }
@@ -280,11 +296,11 @@ coccyx.Router.prototype.execMatch = function(
 coccyx.Router.prototype.goToUri = function(
     arg, opt_suppressHistory, opt_replaceState) {
   var uri = new goog.Uri(arg);
-  var loc = new goog.Uri(this.window_.location);
+  var loc = new goog.Uri(this.getWindow().location);
   var match = new coccyx.RouteMatch();
   if (this.enabled_ && loc.hasSameDomainAs(uri) && this.match(uri, match)) {
     this.execMatch(match, void 0, opt_suppressHistory, opt_replaceState);
-  } else if (arg !== this.window_.location.href) {
+  } else if (arg !== this.getWindow().location.href) {
     this.onRouteNotFound(uri);
   }
 };
@@ -355,7 +371,16 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state,
 coccyx.Router.prototype.onRouteNotFound = function(uri) {
   var dest = goog.isString(uri) ? uri : uri.toString();
   this.getLogger().info('route not found, redirecting to \'' + dest + '\'');
-  this.window_.location = dest;
+  this.getWindow().location = dest;
+};
+
+
+/**
+ * @return {!Window} The window we're installed in. FIXME: probably doesn't
+ *     work, this is a placeholder for future multi-window functionality.
+ */
+coccyx.Router.prototype.getWindow = function() {
+  return this.window_ || (this.parent && this.parent.getWindow()) || window;
 };
 
 
