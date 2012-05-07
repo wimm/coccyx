@@ -5,7 +5,7 @@ goog.addDependency("../../../coccyx/assetrepo.js", ['coccyx.AssetRepo'], ['coccy
 goog.addDependency("../../../coccyx/coccyx.js", ['coccyx'], ['coccyx.App']);
 goog.addDependency("../../../coccyx/coccyxdeps.js", [], []);
 goog.addDependency("../../../coccyx/collection.js", ['coccyx.Collection'], ['coccyx.Model', 'goog.array', 'goog.object', 'goog.pubsub.PubSub', 'goog.structs.Collection']);
-goog.addDependency("../../../coccyx/collection_test.js", [], []);
+goog.addDependency("../../../coccyx/collection_test.js", [], ['coccyx', 'coccyx.Model', 'coccyx.Collection', 'coccyx.Repo', 'goog.testing.jsunit']);
 goog.addDependency("../../../coccyx/controller.js", ['coccyx.CollectionController', 'coccyx.Controller', 'coccyx.ModelController'], ['coccyx.Collection', 'coccyx.Model', 'coccyx.Repo', 'goog.async.Deferred', 'goog.events.EventHandler', 'goog.net.XhrManager']);
 goog.addDependency("../../../coccyx/localrepo.js", [], []);
 goog.addDependency("../../../coccyx/model.js", ['coccyx.Model', 'coccyx.Model.Topics'], ['goog.array', 'goog.object', 'goog.pubsub.PubSub', 'goog.string', 'goog.ui.IdGenerator']);
@@ -16,9 +16,9 @@ goog.addDependency("../../../coccyx/view.js", ['coccyx.View'], ['coccyx.Collecti
 goog.addDependency("../../../coccyx/csrf/csrf.js", ['coccyx.csrf', 'coccyx.csrf.Adapter'], []);
 goog.addDependency("../../../coccyx/csrf/rails.js", ['coccyx.csrf.RailsAdapter'], ['coccyx.csrf']);
 goog.addDependency("../../../coccyx/mux/history.js", ['coccyx.History'], []);
-goog.addDependency("../../../coccyx/mux/route.js", ['coccyx.Route', 'coccyx.RouteMatch', 'coccyx.RouteMatcher'], ['coccyx.Model', 'coccyx.RouteRegExp', 'goog.object', 'goog.string.format']);
-goog.addDependency("../../../coccyx/mux/route_test.js", [], ['coccyx.Route', 'coccyx.RouteRegExp', 'coccyx.Router', 'goog.Uri', 'goog.string', 'goog.testing.jsunit']);
-goog.addDependency("../../../coccyx/mux/router.js", ['coccyx.Router'], ['coccyx.Route', 'goog.debug.Logger']);
+goog.addDependency("../../../coccyx/mux/route.js", ['coccyx.Route', 'coccyx.RouteMatch', 'coccyx.RouteMatcher'], ['coccyx.Model', 'coccyx.RouteRegExp', 'goog.array', 'goog.object', 'goog.pubsub.PubSub', 'goog.string.format']);
+goog.addDependency("../../../coccyx/mux/route_test.js", [], ['coccyx', 'coccyx.Route', 'coccyx.RouteRegExp', 'coccyx.Router', 'goog.Uri', 'goog.string', 'goog.testing.jsunit']);
+goog.addDependency("../../../coccyx/mux/router.js", ['coccyx.Router'], ['coccyx.Route', 'goog.debug.Logger', 'goog.pubsub.PubSub']);
 goog.addDependency("../../../coccyx/mux/routeregexp.js", ['coccyx.RouteRegExp'], ['coccyx.Model']);
 goog.addDependency("../../../coccyx/net/extendedhttpstatus.js", ['coccyx.net.ExtendedHttpStatus'], []);
-goog.addDependency("../../../coccyx/ui/collectionlist.js", ['coccyx.ui.CollectionList'], ['coccyx.Collection', 'coccyx.Model', 'goog.ui.Component', 'wimm.Notification', 'wimm.ui.NotificationWidget']);
+goog.addDependency("../../../coccyx/ui/collectionlist.js", ['coccyx.ui.CollectionList'], ['coccyx.Collection', 'coccyx.Model', 'goog.ui.Component']);

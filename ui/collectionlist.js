@@ -3,13 +3,11 @@ goog.provide('coccyx.ui.CollectionList');
 goog.require('coccyx.Collection');
 goog.require('coccyx.Model');
 goog.require('goog.ui.Component');
-goog.require('wimm.Notification');
-goog.require('wimm.ui.NotificationWidget');
 
 
 
 /**
- * A simple component that handles adding notification widgets to itself.
+ * A simple component that handles adding a list of model widgets to itself.
  * @param {Function} childCtor The constructor for child elements.
  * @param {string|Array.<string>=} opt_containerClasses An optional class or
  *     classes to use for the container element.

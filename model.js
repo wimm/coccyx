@@ -141,8 +141,7 @@ coccyx.Model.prototype.toJSON = function(opt_include) {
     if (obfKey != null && Object.prototype.hasOwnProperty.call(this, obfKey)) {
       var val = this[obfKey];
 
-      //We can do this because 'toJSON' is in a closure compiler externs
-      if (goog.typeOf(val) === 'object' && val['toJSON'] !== void 0) {
+      if (goog.typeOf(val) === 'object' && val.toJSON) {
         val = val.toJSON();
       }
       json[key] = val;
