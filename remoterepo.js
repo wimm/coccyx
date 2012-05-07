@@ -183,7 +183,8 @@ coccyx.RemoteRepo.prototype.saveInternal = function(uri, model, method,
   coccyx.getApp().startLoading();
   var ioId = coccyx.getApp().getNextId();
   var deferred = new goog.async.Deferred(goog.bind(this.onCancel, this, ioId));
-  var payloadString = this.serializeResource(opt_payload || model.toJSON());
+  var payloadString = this.serializeResource(opt_payload ||
+                                             model.toJSON(this.whiteList_));
 
   coccyx.getApp().getXhrManager().send(ioId, uri, method, payloadString,
       null, null, goog.bind(deferred.callback, deferred));
@@ -447,6 +448,14 @@ coccyx.RemoteRepo.prototype.setModelRoute = function(arg) {
  */
 coccyx.RemoteRepo.prototype.setNewModelRoute = function(arg) {
   this.newModelRoute = coccyx.getRoute(arg);
+};
+
+
+/**
+ * @param {Array.<string>} whiteList The attributes to serialize.
+ */
+coccyx.RemoteRepo.prototype.setWhiteList = function(whiteList) {
+  this.whiteList_ = whiteList;
 };
 
 
