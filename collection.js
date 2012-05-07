@@ -263,12 +263,13 @@ coccyx.Collection.prototype.toJSON = function() {
 /**
  * Sets the order of the children in the collection to a new order based on id.
  * Will publish a reorder message only if the order has actually changed.
+ *
+ * Will accept a partial list of ids, appending the unspecified children to the
+ * end of the list in whatever order they were in originally.
+ *
  * @param {Array.<string|number>} ids An array of ids in the desired order.
  */
 coccyx.Collection.prototype.setOrder = function(ids) {
-  if (this.getCount() !== ids.length) {
-    throw Error(coccyx.Collection.Errors.NEW_ORDER_MISMATCHED_COUNT);
-  }
 
   var wasReordered = false;
 
@@ -277,6 +278,9 @@ coccyx.Collection.prototype.setOrder = function(ids) {
     return;
   }
 
+  var partial = (this.getCount() !== ids.length);
+  var ordered = {};
+
   var newChildren = [];
   for (var i = 0; i < ids.length; i++) {
     var child = this.get(ids[i]);
@@ -284,16 +288,23 @@ coccyx.Collection.prototype.setOrder = function(ids) {
       throw Error(coccyx.Collection.Errors.NOT_OUR_CHILD);
     }
     newChildren.push(child);
+    if (partial) { ordered[child.getId()] = child; }
     if (newChildren[i].getId() !== this.children_[i].getId()) {
       wasReordered = true;
     }
   }
 
   if (wasReordered) {
+    if (partial) {
+      for (i = 0; i < this.children_.length; i++) {
+        if (ordered[this.children_[i].getId()] == null) {
+          newChildren.push(this.children_[i]);
+        }
+      }
+    }
     this.children_ = newChildren;
     this.publish(coccyx.Collection.Topics.REORDER, this);
   }
-
 };
 
 

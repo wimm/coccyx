@@ -123,6 +123,18 @@ var testOrdering = function() {
 };
 
 
+var testPartialOrdering = function() {
+  var collection = testRepo.getInstance().collectionForParams(testParams);
+  var order = [100, 5, 4, 6, 7];
+  collection.setOrder(order);
+  var expected = [100, 5, 4, 6, 7, 1, 2, 3, 8, 9, 10];
+
+  for (var i = 0; i < expected.length; i++) {
+    assertEquals(collection.getChildAt(i).id, expected[i]);
+  }
+};
+
+
 /**
  * Removing
  */
