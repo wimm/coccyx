@@ -22,8 +22,14 @@ coccyx.Controller = function() {
    * @protected
    */
   this.logger = goog.debug.Logger.getLogger('coccyx.Controller');
+
+  this.deferreds_ = [];
 };
 goog.inherits(coccyx.Controller, goog.events.EventHandler);
+
+
+/** @type {Array.<goog.async.Deferred>} */
+coccyx.Controller.deferreds_;
 
 
 /**
@@ -40,6 +46,40 @@ coccyx.Controller.prototype.setRepo = function(repository) {
  */
 coccyx.Controller.prototype.getRepo = function() {
   return this.repo_;
+};
+
+
+/**
+ * Adds a deferred to the list of active deferreds.
+ * Useful for when the view controllers switch views and
+ * we have outstanding deferreds we no longer require and
+ * actually don't want to run.
+ * @param {goog.async.Deferred} deferred the deferred to add.
+ */
+coccyx.Controller.prototype.addDeferred = function(deferred) {
+  this.deferreds_.push(deferred);
+};
+
+
+/**
+ * Cancels all outstanding deferreds.
+ */
+coccyx.Controller.prototype.removeAllDeferreds = function() {
+  while (this.deferreds_.length) {
+    this.deferreds_.pop().cancel();
+  }
+};
+
+
+/**
+ * An alias for EventHandler.removeAll.
+ * Since the controller class inherits from EventHandler, it gets a lot
+ * of nice event management methods that are helpful to controllers. However,
+ * 'removeAll' is just a bit ambiguous to read in controller code, we this is
+ * just a simple alias for it.
+ */
+coccyx.Controller.prototype.removeAllEvents = function() {
+  this.removeAll();
 };
 
 
