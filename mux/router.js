@@ -4,6 +4,7 @@ goog.provide('coccyx.Router');
 goog.require('coccyx.Route');
 goog.require('goog.debug.Logger');
 goog.require('goog.pubsub.PubSub');
+goog.require('goog.userAgent');
 
 // Portions Copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -156,7 +157,10 @@ coccyx.Router.prototype.install = function(opt_win) {
       window.history.replaceState && !navigator.userAgent.match(
           /((iPod|iPhone|iPad).+\bOS\s+[1-4]|WebApps\/.+CFNetwork)/));
 
-  this.statePopped_ = ('state' in this.getWindow().history);
+  // Can't detect via capabilities any longer, so we have to check against
+  // webkit.
+  this.statePopped_ = !goog.userAgent.WEBKIT;
+
   this.initialUri_ = this.getWindow().location.href;
 
   if (this.enabled_) {
