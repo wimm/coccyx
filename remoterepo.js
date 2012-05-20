@@ -3,6 +3,7 @@ goog.provide('coccyx.RemoteRepo');
 goog.require('coccyx.Model');
 goog.require('coccyx.Repo');
 goog.require('coccyx.csrf');
+goog.require('goog.async.Deferred');
 goog.require('goog.debug.Logger');
 goog.require('goog.net.XhrManager');
 
@@ -468,5 +469,3 @@ coccyx.RemoteRepo.Method = {
   PUT: 'PUT',
   DELETE: 'DELETE'
 };
-
-

@@ -2,6 +2,7 @@ goog.provide('coccyx.Router');
 
 
 goog.require('coccyx.Route');
+goog.require('goog.Uri');
 goog.require('goog.debug.Logger');
 goog.require('goog.pubsub.PubSub');
 goog.require('goog.userAgent');
