@@ -163,7 +163,7 @@ coccyx.Repo.prototype.modelForParams = function(params) {
       /** @type {string|number} */ (params[this.getIdKey()]));
   if (!child) {
     child = this.newModel();
-    child.setJSON(params);
+    child.setJSON(params, true);
     this.cache.add(child);
   } else {
     child.setJSON(params);

@@ -29,6 +29,8 @@ coccyx.Model = function(repo) {
   goog.base(this);
   this.setRepo(repo);
 
+  this.dirtyAttributes = {};
+
   /**
    * @protected
    */
@@ -56,9 +58,9 @@ coccyx.Model.prototype.get = function(key) {
  *     model's attributes.
  * @param {*=} opt_value The value for the given key (only if a string was
  *     passed as the initial arg).
+ * @param {boolean=} opt_suppress If true, don't publish change notifications.
  */
-coccyx.Model.prototype.set = function(arg, opt_value) {
-
+coccyx.Model.prototype.set = function(arg, opt_value, opt_suppress) {
   var obj;
 
   if (goog.typeOf(arg) === 'string') {
@@ -73,6 +75,7 @@ coccyx.Model.prototype.set = function(arg, opt_value) {
      * @type {Array.<string>}
      */
     var updated = [];
+
     var oldVals = [];
 
     // walk through the keys on the json object and use the obfuscated attribute
@@ -81,23 +84,33 @@ coccyx.Model.prototype.set = function(arg, opt_value) {
         function(val, key, object) {
           var obfKey = this.attributeKeys[key];
           if (obfKey && this[obfKey] !== val) {
-            oldVals.push(this[obfKey]);
+            if (!opt_suppress) {
+              oldVals.push(this[obfKey]);
+              updated.push(key);
+            }
             //NOTE: this is unsafe-ish, since we're ignoring types.
             this[obfKey] = val;
-            updated.push(key);
           } else if (!obfKey) {
             this.logger.warning('unknown key: ' + key);
           }
         }, this);
 
-    this.change(updated, oldVals);
+    if (!opt_suppress) { this.change(updated, oldVals); }
   }
 };
 
 
 /**
- * Publishes a change notification for one or more optional attributes and also
+ * Publishes a change notification for one or more optional attributes and
  * publishes a change notification for the model as a whole.
+ *
+ * Updates the map of dirty attributes only if the changed fields are not
+ * already flagged as dirty (to ensure that the original value is retained in
+ * the case where the field is changed twice between saves).
+ *
+ * If the new value for the field is the same as what was stored off on the
+ * dirtyAttributes map, the dirty flag for that attribute is reset so that
+ * subscribers don't get notifications for fields that haven't changed.
  *
  * @param {string|Array.<string>} arg The key or array of keys
  *     that were changed, if any.
@@ -110,13 +123,22 @@ coccyx.Model.prototype.change = function(arg, oldValue) {
     var keys = /** @type {Array} */ (arg);
     var oldVals = /** @type {Array} */ (oldValue);
     for (var i = 0; i < keys.length; i++) {
+      if (this.dirtyAttributes[keys[i]] === void 0) {
+        this.dirtyAttributes[keys[i]] = oldVals[i];
+      } else if (this.dirtyAttributes[keys[i]] === this.get(keys[i])) {
+        delete this.dirtyAttributes[keys[i]];
+      }
       this.publish(keys[i], this, this.get(keys[i]), oldVals[i]);
     }
     this.publish(coccyx.Model.Topics.CHANGE, this);
   } else if (goog.typeOf(arg) === 'string') {
-    this.publish(/** @type {string} */ (arg),
-        this, this.get(/** @type {string} */ (arg)),
-        oldValue);
+    var key = /** @type {string} */ (arg);
+    if (this.dirtyAttributes[key] === void 0) {
+      this.dirtyAttributes[key] = oldValue;
+    } else if (this.dirtyAttributes[key] === this.get(key)) {
+      delete this.dirtyAttributes[key];
+    }
+    this.publish(key, this, this.get(key), oldValue);
     this.publish(coccyx.Model.Topics.CHANGE, this);
   }
 };
@@ -158,8 +180,11 @@ coccyx.Model.prototype.toJSON = function(opt_include) {
  *     the two when instantiating object graphs from deep JSON structures so
  *     that we know when to simply set an attribute or when to instantiate a new
  *     child object.
+ * @param {boolean=} opt_suppress If true, don't publish change notifications.
  */
-coccyx.Model.prototype.setJSON = coccyx.Model.prototype.set;
+coccyx.Model.prototype.setJSON = function(obj, opt_suppress) {
+  this.set(obj, void 0, opt_suppress);
+};
 
 
 /**
@@ -184,14 +209,19 @@ coccyx.Model.prototype.setAttributeKeys = function(obj) {
  *     the given topic.
  * @param {Object=} opt_context Object in whose context the function is to be
  *     called (the global scope if none).
+ * @param {boolean=} opt_onSave If true, send a notification only when the
+ *     attribute is changed and the model is saved successfully.
  * @return {number} Subscription key.
  */
-coccyx.Model.prototype.subscribe = function(topic, fn, opt_context) {
+coccyx.Model.prototype.subscribe = function(
+    topic, fn, opt_context, opt_onSave) {
   if (!(topic in this.attributeKeys) && !(topic in coccyx.Model.TopicKeys) &&
       topic !== this.getRepo().getIdKey()) {
     throw Error('Uknown topic: ' + topic);
   }
-
+  if (opt_onSave) {
+    topic = topic + coccyx.Model.Topics.SAVE;
+  }
   return goog.base(this, 'subscribe', topic, fn, opt_context);
 };
 
@@ -216,6 +246,32 @@ coccyx.Model.prototype.save = function() {
 
 
 /**
+ * Reverts a model to it's last saved state. Does not re-fetch model data from
+ * the service. Change notifications will be sent for each reverted field.
+ *
+ * @param {string|Array.<string>=} opt_arg If provided, the key or array of keys
+ *     to revert, otherwise all dirty attributes will be reverted.
+ */
+coccyx.Model.prototype.revert = function(opt_arg) {
+  if (opt_arg === void 0) {
+    this.set(this.dirtyAttributes);
+  } else if (goog.isString(opt_arg)) {
+    var key = /** @type {string} **/ (opt_arg);
+    if (key in this.dirtyAttributes) {
+      this.set(key, this.dirtyAttributes[key]);
+    }
+  } else if (goog.isArray(opt_arg)) {
+    var keys = /** @type {Array.<string>} **/ (opt_arg);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] in this.dirtyAttributes) {
+        this.set(keys[i], this.dirtyAttributes[keys[i]]);
+      }
+    }
+  }
+};
+
+
+/**
  * Uses the configured repository to persist the model.
  * @return {goog.async.Deferred} The deferrable to give back to the caller.
  */
@@ -231,11 +287,18 @@ coccyx.Model.prototype.destroy = function() {
 
 
 /**
- * Publishes an update message..
+ * Publishes an save message for the model, and publishes a save message for
+ * each attribute modified since the last save. Save notifications for
+ * attributes are of the fomat "[attribute name]_save", for example "id_save" or
+ * "name_save".
  * @return {coccyx.Model} the modified model.
  */
 coccyx.Model.prototype.onSave = function() {
   this.publish(coccyx.Model.Topics.SAVE, this);
+  goog.object.forEach(this.dirtyAttributes, function(oldVal, key) {
+    this.publish(key + coccyx.Model.Topics.SAVE, this, this.get(key), oldVal);
+  }, this);
+  this.dirtyAttributes = {};
   return this;
 };
 
@@ -259,8 +322,9 @@ coccyx.Model.prototype.onDestroy = function() {
 
 
 /**
- * @return {boolean} Whether the model is valid. Override this method
- * to perform your own validation.
+ * Determines whether the model is locally valid. To provide custom validation
+ * methods, override validateInternal.
+ * @return {boolean} Whether the model is valid.
  */
 coccyx.Model.prototype.validate = function() {
   this.setErrors(null);
@@ -270,7 +334,9 @@ coccyx.Model.prototype.validate = function() {
 
 
 /**
- * Validates the model, setting errors on the errors object as needed.
+ * Validates the model, setting errors on the errors object as needed. Override
+ * this method to perform your own validation. Calling addError non-zero times
+ * within this function will flag the model as invalid.
  * @type {function()}
  * @protected
  */
@@ -279,7 +345,7 @@ coccyx.Model.prototype.validateInternal = goog.nullFunction;
 
 /**
  * Sets errors on the model based on the same string/attribute mapping used for
- * toJSON and fromJSON. Errors objects can have either a string error message,
+ * toJSON and setJSON. Errors objects can have either a string error message,
  * or an array of string error messages as their value.
  * @param {Object.<string,string|Array.<string>>} errors The JSON representation
  *     of the errors for this model. Keys must be members of this.attributeKeys.
@@ -378,6 +444,16 @@ coccyx.Model.prototype.repo;
 
 
 /**
+ * The map of dirty fields, used for reverting a model back to it's saved state.
+ * The keys are the non-obfuscated attribute names, the values are the old
+ * values for those attributes.
+ * @type {Object.<string,*>} The map of dirty fields.
+ * @protected
+ */
+coccyx.Model.prototype.dirtyAttributes;
+
+
+/**
  * Constants for topics. Anything in this.attributeKeys can also be used as a
  * topic.
  * @enum {string}
@@ -399,5 +475,3 @@ coccyx.Model.Topics = {
  * @type {Object}
  */
 coccyx.Model.TopicKeys = goog.object.transpose(coccyx.Model.Topics);
-
-
