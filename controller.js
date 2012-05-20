@@ -151,7 +151,8 @@ coccyx.ModelController.prototype.show = function(params, opt_model) {
 
 /**
  * @param {coccyx.Model} model The instantiated model object.
- * @return {goog.ui.Component} The new or updated component.
+ * @return {goog.ui.Component|goog.async.Deferred} The new or updated component
+ *     or a deferred representing the request(s) to display it.
  */
 coccyx.ModelController.prototype.onShow = goog.abstractMethod;
 
@@ -186,7 +187,8 @@ coccyx.ModelController.prototype.edit = function(params, opt_model) {
 
 /**
  * @param {coccyx.Model} model The instantiated model object.
- * @return {goog.ui.Component} The new or updated component.
+ * @return {goog.ui.Component|goog.async.Deferred} The new or updated component
+ *     or a deferred representing the request(s) to display it.
  */
 coccyx.ModelController.prototype.onEdit = goog.abstractMethod;
 
@@ -227,7 +229,8 @@ coccyx.CollectionController.prototype.index = function(params, opt_collection) {
 /**
  * Callback added to the deferred's chain in .index().
  * @param {coccyx.Collection} collection the list of parsed resource objects.
- * @return {goog.ui.Component} The new or updated component.
+ * @return {goog.ui.Component|goog.async.Deferred} The new or updated component
+ *     or a deferred representing the request(s) to display it.
  * @protected
  */
 coccyx.CollectionController.prototype.onIndex = goog.abstractMethod;
@@ -254,5 +257,3 @@ coccyx.CollectionController.prototype.getCollection = function() {
 coccyx.CollectionController.prototype.setCollection = function(collection) {
   this.collection_ = collection;
 };
-
-

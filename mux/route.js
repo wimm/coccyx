@@ -38,7 +38,7 @@ coccyx.Route.prototype.parent = null;
 
 
 /**
- * @type {function(Object.<string,string>, *=)} The function to call
+ * @type {function(Object.<string,string>, *=)|undefined} The function to call
  *     on match.
  * @protected
  */
@@ -75,11 +75,33 @@ coccyx.Route.prototype.buildOnly = false;
 
 
 /**
+ * @type {boolean} Whether the route should be execced at page load or if it
+ *     is just used for matching nav links.
+ * @protected
+ */
+coccyx.Route.prototype.matchOnly = false;
+
+
+/**
  * @type {Object.<string,*>} The default params to return when this route is
  *     matched.
  * @protected
  */
 coccyx.Route.prototype.params = null;
+
+
+/**
+ * @type {string} The route's name.
+ * @protected
+ */
+coccyx.Route.prototype.name;
+
+
+/**
+ * @type {string} The module to load before executing the route's handler.
+ * @protected
+ */
+coccyx.Route.prototype.module;
 
 
 /**
@@ -168,6 +190,33 @@ coccyx.Route.prototype.isMatchOnly = function() {
 
 
 /**
+ * Setting a module name will load that module if no handler function has been
+ * set on this route. In your module get this route by name and call setHandler
+ * on it before calling setLoaded on the module manager.
+ *
+ * Once setLoaded has been called on the named module, the router will attempt
+ * to execute the handler on this route.
+ *
+ * @param {string} moduleName The name of the module to load before executing
+ *     the handler function.
+ * @return {coccyx.Route} Return self for chaining.
+ */
+coccyx.Route.prototype.setModule = function(moduleName) {
+  this.module = moduleName;
+  return this;
+};
+
+
+/**
+ * @return {string} The name of the module to load if no handler function is
+ *     found.
+ */
+coccyx.Route.prototype.getModule = function() {
+  return this.module;
+};
+
+
+/**
  * We want to be able to lazily initialize controllers when the user actually
  * needs them. An optional context parameter can be passed to act as the 'this'
  * object. However, this method also accepts a constructor for a controller that
@@ -191,10 +240,10 @@ coccyx.Route.prototype.setHandler = function(method, opt_context) {
     var c = opt_context;
 
     this.handler = function(params, state) {
-      if (goog.typeOf(c) === 'function' && c.getInstance) {
+      if (goog.isFunction(c) && c.getInstance) {
         c = c.getInstance();
       }
-      method.call(c, params, state);
+      return method.call(c, params, state);
     };
   } else {
     this.handler = method;
@@ -204,10 +253,11 @@ coccyx.Route.prototype.setHandler = function(method, opt_context) {
 
 
 /**
- * @return {function(Object.<string,string>, *=)} The handler for this route.
+ * @return {function(Object.<string,string>, *=)|undefined} The handler for this
+ *     route.
  */
 coccyx.Route.prototype.getHandler = function() {
-  return this.handler || goog.nullFunction;
+  return this.handler;
 };
 
 
@@ -225,6 +275,14 @@ coccyx.Route.prototype.setName = function(name) {
   this.getNamedRoutes()[name] = this;
 
   return this;
+};
+
+
+/**
+ * @return {string} The route name.
+ */
+coccyx.Route.prototype.getName = function() {
+  return this.name;
 };
 
 
@@ -420,7 +478,7 @@ coccyx.RouteMatch.prototype.route = null;
 
 
 /**
- * @type {function(Object.<string,string>, *=)} The handler for the
+ * @type {function(Object.<string,string>, *=)|undefined} The handler for the
  *     matching route.
  */
 coccyx.RouteMatch.prototype.handler;

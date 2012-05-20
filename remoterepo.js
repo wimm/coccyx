@@ -279,6 +279,7 @@ coccyx.RemoteRepo.prototype.onDestroy = function(model) {
  * @protected
  */
 coccyx.RemoteRepo.prototype.onCancel = function(ioId) {
+  this.logger.severe('Cancelling ' + ioId);
   coccyx.getApp().getXhrManager().abort(ioId);
 };
 

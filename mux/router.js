@@ -90,13 +90,14 @@ coccyx.Router.prototype.match = function(uri, match) {
 /**
  * @param {string|coccyx.Route} arg The name of the desired route, or
  *     for convenience, the route itself (which will simply be returned).
- * @return {?coccyx.Route} The route or undefined.
+ * @return {coccyx.Route} The route or null.
  */
 coccyx.Router.prototype.get = function(arg) {
   if (goog.typeOf(arg) === 'string') {
     var route = this.getNamedRoutes()[/** @type {string} */(arg)];
     if (!route) {
       this.getLogger().severe('Could not find route with name: ' + arg);
+      return null;
     } else {
       return route;
     }
@@ -211,9 +212,10 @@ coccyx.Router.prototype.onPopState = function(e) {
   var matched = this.match(uri, match);
   if (matched) {
     if (this.currentMatch && this.currentMatch.equals(match)) {
-      this.getLogger().info('already on \'' + match.route.name + '\'');
+      this.getLogger().info('already on \'' + match.route.getName() + '\'');
     } else {
-      this.getLogger().info('routing back to \'' + match.route.name + '\'');
+      this.getLogger().info(
+          'routing back to \'' + match.route.getName() + '\'');
       this.execMatch(match, e.state, true);
       this.currentUri = uri;
     }
@@ -248,6 +250,8 @@ coccyx.Router.prototype.onClick = function(e) {
  *     history state calls.
  * @param {boolean=} opt_replaceState Whether to replace the current state
  *     instead of pushing the new state.
+ * @return {goog.async.Deferred} A deferred representing execution result of the
+ *     route handler. May also include the process of loading a module.
  * @protected
  */
 coccyx.Router.prototype.execMatch = function(
@@ -255,21 +259,18 @@ coccyx.Router.prototype.execMatch = function(
   var route = match.route;
   var params = match.params;
   if (route.isBuildOnly()) {
-    this.onRouteNotFound(route.uri(params));
+    return this.onRouteNotFound(route.uri(params));
   } else {
     if (this.currentMatch && this.currentMatch.equals(match)) {
       this.getLogger().info('already on route: ' + route.uri(params));
+      // the current, already succeeded deferred will be returned
     } else if (route.isMatchOnly()) {
+      this.getLogger().info('route is match only, setting location');
       this.getWindow().location = match.route.uri(params);
+      this.currentMatch.result = goog.async.Deferred.cancelled();
     } else {
       this.currentMatch = match;
-      this.getLogger().info('routing to \'' + route.name + '\'');
-
-      this.getWindow().setTimeout(goog.bind(function() {
-        route.getHandler()(params, opt_state);
-        route.publish(coccyx.Route.Topics.MATCH, route, params);
-        this.publish(coccyx.Router.Topics.ROUTE_CHANGE, this, route, params);
-      }, this), 0);
+      this.getLogger().info('routing to \'' + route.getName() + '\'');
 
       if (this.enabled_) {
         var uri = route.uri(params);
@@ -283,7 +284,34 @@ coccyx.Router.prototype.execMatch = function(
           this.getWindow().history.pushState(opt_state || null, '', uri);
         }
       }
+
+      // We want to call the matching here so the nav expands immediately.
+      // It's entirely possible this could cause issues for other people,
+      // however, so we may need to do this in a branch off the deferred
+      // instead.
+      route.publish(coccyx.Route.Topics.MATCH, route, params);
+      this.publish(coccyx.Router.Topics.ROUTE_CHANGE, this, route, params);
+
+      var deferred;
+      if (route.getHandler() == null) {
+        deferred = goog.module.ModuleManager.getInstance().load(
+            route.getModule());
+        deferred.addCallback(function() {
+          return route.getHandler()(params, opt_state);
+        }, this);
+      } else {
+        var handler = route.getHandler();
+        var result = handler(params, opt_state);
+        if (result instanceof goog.async.Deferred) {
+          deferred = result;
+        } else {
+          deferred = goog.async.Deferred.succeed(result);
+        }
+      }
+
+      this.currentMatch.result = deferred;
     }
+    return this.currentMatch.result;
   }
 };
 
@@ -297,17 +325,24 @@ coccyx.Router.prototype.execMatch = function(
  *     history state calls.
  * @param {boolean=} opt_replaceState Whether to replace the current state
  *     instead of pushing the new state.
+ * @return {goog.async.Deferred} A deferred representing execution result of the
+ *     route handler. May also include the process of loading a module.
  */
 coccyx.Router.prototype.goToUri = function(
     arg, opt_suppressHistory, opt_replaceState) {
   var uri = new goog.Uri(arg);
   var loc = new goog.Uri(this.getWindow().location);
   var match = new coccyx.RouteMatch();
+  var deferred;
   if (this.enabled_ && loc.hasSameDomainAs(uri) && this.match(uri, match)) {
-    this.execMatch(match, void 0, opt_suppressHistory, opt_replaceState);
+    deferred = this.execMatch(
+        match, void 0, opt_suppressHistory, opt_replaceState);
   } else if (arg !== this.getWindow().location.href) {
-    this.onRouteNotFound(uri);
+    deferred = this.onRouteNotFound(uri);
+  } else {
+    deferred = goog.async.Deferred.cancelled();
   }
+  return deferred;
 };
 
 
@@ -320,6 +355,8 @@ coccyx.Router.prototype.goToUri = function(
  *     history state calls.
  * @param {boolean=} opt_replaceState Whether to replace the current state
  *     instead of pushing the new state.
+ * @return {goog.async.Deferred} A deferred representing execution result of the
+ *     route handler. May also include the process of loading a module.
  */
 coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state,
     opt_suppressHistory, opt_replaceState) {
@@ -348,6 +385,7 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state,
     }
   }
 
+  var deferred;
   if (route) {
     //add any default params that haven't been parsed
     if (route.getParams()) {
@@ -359,11 +397,13 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state,
     match.route = route;
     match.params = params;
     match.handler = route.getHandler();
-    this.execMatch(match, void 0, opt_suppressHistory, opt_replaceState);
+    deferred = this.execMatch(
+        match, void 0, opt_suppressHistory, opt_replaceState);
   } else {
     this.getLogger().severe('route not found: \'' + arg + '\'');
+    deferred = goog.async.Deferred.cancelled();
   }
-
+  return deferred;
 };
 
 
@@ -371,12 +411,14 @@ coccyx.Router.prototype.goToRoute = function(arg, opt_paramArg, opt_state,
  * By default, we just redirect to the given URL and let the server
  * figure out if this is a non-dynamic page or a bad URI.
  * @param {goog.Uri|string} uri The uri we couldn't match.
+ * @return {goog.async.Deferred} A cancelled deferred.
  * @protected
  */
 coccyx.Router.prototype.onRouteNotFound = function(uri) {
   var dest = goog.isString(uri) ? uri : uri.toString();
   this.getLogger().info('route not found, redirecting to \'' + dest + '\'');
   this.getWindow().location = dest;
+  return goog.async.Deferred.cancelled();
 };
 
 
