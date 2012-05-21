@@ -1,8 +1,6 @@
 
 /**
- * @fileoverview This is a rough port of Backbone.js' Model class modified to
- * work with the Closure library for things like publish/subscribe, ajax methods
- * and the other support functionality.
+ * @fileoverview The base model class for coccyx.
  *
  * This class inherits from {goog.pubsub.PubSub} to provide notifications to
  * subscribed observers.

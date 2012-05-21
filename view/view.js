@@ -1,7 +1,4 @@
 goog.provide('coccyx.View');
-//Putting this in here seems to cause some issues if you're
-//not actually defining the events anywhere.
-//goog.provide('coccyx.View.Events');
 
 goog.require('coccyx.Collection');
 goog.require('coccyx.Model');
@@ -10,7 +7,7 @@ goog.require('goog.ui.Component');
 
 
 /**
- * Simple wrapper around goog.ui.Component to .
+ * Placeholder wrapper around goog.ui.Component. Future functionality TBD.
  *
  * @param {goog.dom.DomHelper=} opt_domHelper Optional DOM helper.
  * @constructor

@@ -3,7 +3,7 @@ goog.provide('coccyx.csrf.Adapter');
 
 /*
  * This is a simple class that is currently just wrapping a rudimentary rails
- * adapter, eventually it may have multi-document csrf token handling
+ * adapter.
  */
 
 

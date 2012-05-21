@@ -4,7 +4,7 @@ goog.require('coccyx.Model');
 
 // Portions copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the GORILLA-LICENSE file.
+// license that can be found in the gorillalicense.txt file.
 
 
 
